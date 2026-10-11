@@ -68,6 +68,7 @@ try {
  await page.getByRole('button',{name:'Complete Reminder',exact:true}).click();
  await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
  assert.match(await page.locator('.dashboard-hero').innerText(),/Welcome, Jordan Demo/);
+ await page.getByLabel('Demo response (fictional text only)').fill('In this fictional scenario, I practiced the sample routine.');
  await page.getByRole('button',{name:'Submit Sample Homework',exact:true}).click();
  await page.getByLabel('Requested date').fill('2099-01-02');
  await page.getByLabel('Requested time (Eastern Time)').selectOption('11:00');
@@ -81,6 +82,30 @@ try {
  await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
  assert.match(await page.locator('main').innerText(),/2099-01-02 at 11:00/);
  assert.match(await page.locator('main').innerText(),/Status: Reviewed/);
+ assert.match(await page.locator('main').innerText(),/In this fictional scenario, I practiced the sample routine/);
+ await page.getByRole('button',{name:'Request Demo Cancellation',exact:true}).click();
+ assert.match(await page.locator('main').innerText(),/Cancellation request: Pending/);
+ assert.match(await page.locator('main').innerText(),/Appointment: 2099-01-02 at 11:00/);
+ await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await page.getByRole('button',{name:'Decline Demo Cancellation',exact:true}).click();
+ await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ assert.match(await page.locator('main').innerText(),/Cancellation request: Declined/);
+ assert.match(await page.locator('main').innerText(),/Appointment: 2099-01-02 at 11:00/);
+ await page.getByRole('button',{name:'Request Demo Cancellation',exact:true}).click();
+ await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await page.getByRole('button',{name:'Approve Demo Cancellation',exact:true}).click();
+ await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ assert.match(await page.locator('main').innerText(),/Cancelled — no confirmed appointment/);
+ await page.getByRole('button',{name:'Start Another Demo Request',exact:true}).click();
+ await page.locator('.modal-backdrop').getByLabel('Fictional client').selectOption('Taylor Example');
+ await page.getByRole('button',{name:'Submit Fictional Request',exact:true}).click();
+ await page.getByRole('button',{name:'Track in Client Portal',exact:true}).click();
+ assert.match(await page.locator('.dashboard-hero').innerText(),/Welcome, Taylor Example/);
+ assert.doesNotMatch(await page.locator('.dashboard-hero').innerText(),/Taylor Hayes|Jordan Demo/);
+ assert.doesNotMatch((await page.locator('.care-plan').allInnerTexts()).join(' '),/Jordan Demo|In this fictional scenario/);
+ await page.getByLabel('Fictional client',{exact:false}).selectOption('demo-1');
+ assert.match(await page.locator('.dashboard-hero').innerText(),/Welcome, Jordan Demo/);
+
  // Updated content stays responsive at every tested width, including workspace and queue.
  for (const width of [320,375,768,1024,1440,1920]) {
   await page.setViewportSize({width,height:900});

@@ -11,7 +11,7 @@ vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
 const run = code=>vm.runInContext(code,context);
 function event(selector, dataset, fields, type='click') {
  let callback;
- const el={dataset,fields,addEventListener:(name,fn)=>{if(name===type) callback=fn;}};
+ const el={dataset,fields,form:fields ? {fields} : undefined,addEventListener:(name,fn)=>{if(name===type) callback=fn;}};
  elements={[selector]:[el]}; run('bindEvents()'); elements={}; assert.ok(callback,selector); callback({preventDefault(){}});
 }
 function submit(name='Jordan Demo') {
@@ -86,4 +86,35 @@ assert.match(run('clientPortal()'),/Practice a sample breathing routine/);
 event('[data-homework-submit]',{homeworkSubmit:'homework-1',careClient:sampleId});
 assert.equal(run('careDetails(selectedCareRecord()).homework[0].status'),'Submitted');
 assert.equal(run('careDetails(state.demoRequests[0]).homework.length'),0);
+// Phase 3: richer activities, escaped text, optional reasons, and cancellation outcomes.
+run('state.view="counselor"; state.demoCounselorId="rachel-kim"; state.workspaceClientId=state.activeRequestId');
+event('[data-homework-assign]',{homeworkAssign:sampleId},{title:'Complete the sample worksheet',customTitle:'Fictional worksheet <example>',instructions:'Use a mock goal <only>.',due:'2099-01-01'},'submit');
+run('state.view="client"');
+assert.match(run('homeworkPanel(selectedCareRecord(),false)'),/Fictional worksheet &lt;example&gt;/);
+event('[data-homework-submit]',{homeworkSubmit:'homework-2',careClient:sampleId},{response:'A fictional response <sample>.'});
+assert.equal(run('careDetails(selectedCareRecord()).homework[1].response'),'A fictional response <sample>.');
+assert.match(run('homeworkPanel(selectedCareRecord(),true)'),/response &lt;sample&gt;/);
+assert.equal(run('careDetails(selectedCareRecord()).homework[1].type'),'Worksheet');
+event('[data-reschedule-request]',{rescheduleRequest:sampleId},{date:'2099-01-06',time:'14:00',reason:''},'submit');
+assert.equal(run('careDetails(selectedCareRecord()).reschedule.reason'),'No reason provided');
+run('state.view="admin"');
+event('[data-reschedule-approve]',{rescheduleApprove:sampleId});
+run('state.view="client"');
+event('[data-cancellation-request]',{cancellationRequest:sampleId},{reason:''},'submit');
+assert.equal(run('selectedCareRecord().appointment.date'),'2099-01-06');
+assert.match(run('cancellationSummary(selectedCareRecord())'),/Pending/);
+run('state.view="admin"');
+event('[data-cancellation-decline]',{cancellationDecline:sampleId});
+assert.equal(run('selectedCareRecord().appointment.date'),'2099-01-06');
+run('state.view="client"');
+event('[data-cancellation-request]',{cancellationRequest:sampleId},{reason:''},'submit');
+run('state.view="admin"');
+event('[data-cancellation-approve]',{cancellationApprove:sampleId});
+assert.equal(run('selectedCareRecord().appointment'),null);
+assert.equal(run('careDetails(selectedCareRecord()).cancelled'),true);
+assert.match(run('demoRequestSummary(selectedCareRecord())'),/Cancelled — no confirmed appointment/);
+assert.match(run('clientPortal()'),/Original sample fixture/);
+run('state.activeRequestId="demo-2"');
+assert.match(run('clientPortal()'),/Connected fictional request/);
+assert.doesNotMatch(run('clientPortal()').replace(/<select[\s\S]*?<\/select>/g,''),/Taylor Hayes|Fictional worksheet|A fictional response/);
 console.log('PASS: homework assignment/submission/review, intake, reminders, reschedule approval/decline, correct client identity, cross-client and counselor isolation, invalid dates.');
