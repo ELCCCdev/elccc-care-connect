@@ -1,0 +1,89 @@
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const html = readFileSync('index.html', 'utf8');
+const root = {innerHTML:''};
+let elements = {};
+const document = {getElementById:()=>root, querySelectorAll:s=>elements[s] || [], querySelector:()=>null};
+class DemoFormData { constructor(form) {this.fields=form.fields;} get(key) {return this.fields[key];} }
+const context = vm.createContext({document, window:{scrollTo(){}}, FormData:DemoFormData, console});
+vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
+const run = code=>vm.runInContext(code,context);
+function event(selector, dataset, fields, type='click') {
+ let callback;
+ const el={dataset,fields,addEventListener:(name,fn)=>{if(name===type) callback=fn;}};
+ elements={[selector]:[el]}; run('bindEvents()'); elements={}; assert.ok(callback,selector); callback({preventDefault(){}});
+}
+function submit(name='Jordan Demo') {
+ run('state.bookingCounselor = counselors.find(c => c.id === "rachel-kim"); state.bookingSubmitted = false');
+ event('[data-booking-form]',{}, {name,concern:'Anxiety',format:'Telehealth'},'submit');
+}
+
+submit();
+event('[data-demo-contact]',{demoContact:'demo-1'});
+event('[data-demo-assign]',{demoAssign:'demo-1'},{counselor:'rachel-kim'},'submit');
+event('[data-demo-schedule]',{demoSchedule:'demo-1'},{date:'2099-01-01',time:'09:00'},'submit');
+run('state.view="counselor"; state.workspaceClientId="demo-1"');
+event('[data-homework-assign]',{homeworkAssign:'demo-1'},{title:'Sample reflection exercise',due:'2099-01-01'},'submit');
+assert.equal(run('careDetails(state.demoRequests[0]).homework.length'),1);
+assert.match(run('counselorWorkspace()'),/Sample reflection exercise/);
+run('state.view="client"');
+assert.match(run('clientPortal()'),/Welcome, Jordan Demo/);
+event('[data-sample-intake]',{sampleIntake:'demo-1'},{preference:'Evening',orientation:'Reviewed'},'submit');
+assert.equal(run('careDetails(state.demoRequests[0]).intake.submitted'),true);
+event('[data-homework-submit]',{homeworkSubmit:'homework-1',careClient:'demo-1'});
+assert.equal(run('careDetails(state.demoRequests[0]).homework[0].status'),'Submitted');
+event('[data-reschedule-request]',{rescheduleRequest:'demo-1'},{date:'2099-01-02',time:'11:00',reason:'Demo schedule conflict'},'submit');
+assert.equal(run('state.demoRequests[0].appointment.date'),'2099-01-01');
+run('state.view="counselor"');
+assert.match(run('counselorWorkspace()'),/Reschedule request: Pending/);
+event('[data-homework-review]',{homeworkReview:'homework-1',careClient:'demo-1'});
+event('[data-reminder-toggle]',{reminderToggle:'follow-up',careClient:'demo-1'});
+assert.equal(run('careDetails(state.demoRequests[0]).homework[0].status'),'Reviewed');
+assert.equal(run('careDetails(state.demoRequests[0]).reminders[0].done'),true);
+run('state.view="admin"');
+assert.match(run('adminReschedulePanel()'),/Reschedule request: Pending/);
+event('[data-reschedule-approve]',{rescheduleApprove:'demo-1'});
+assert.equal(run('state.demoRequests[0].appointment.date'),'2099-01-02');
+assert.match(run('clientPortal()'),/2099-01-02 at 11:00/);
+submit('Taylor Example');
+run('state.view="client"');
+assert.match(run('clientPortal()'),/Welcome, Taylor Example/);
+assert.doesNotMatch(run('clientPortal()').replace(/<select[\s\S]*?<\/select>/g, ''),/Jordan Demo|Sample reflection exercise|2099-01-02/);
+// Forged stale client action cannot modify another selected client.
+event('[data-homework-submit]',{homeworkSubmit:'homework-1',careClient:'demo-1'});
+assert.equal(run('careDetails(state.demoRequests[1]).homework[0].status'),'Reviewed');
+run('state.view="counselor"; state.demoCounselorId="melissa-smith"; state.workspaceClientId="demo-1"');
+assert.doesNotMatch(run('counselorWorkspace()').replace(/<select[\s\S]*?<\/select>/g, ''),/Jordan Demo|Sample reflection exercise/);
+event('[data-homework-assign]',{homeworkAssign:'demo-1'},{title:'Sample reflection exercise',due:'2099-01-01'},'submit');
+assert.equal(run('careDetails(state.demoRequests[1]).homework.length'),1);
+run('state.activeRequestId="demo-1"; state.view="client"');
+event('[data-reschedule-request]',{rescheduleRequest:'demo-1'},{date:'2099-01-03',time:'14:00',reason:'Demo schedule conflict'},'submit');
+run('state.view="admin"');
+event('[data-reschedule-decline]',{rescheduleDecline:'demo-1'});
+assert.equal(run('state.demoRequests[1].appointment.date'),'2099-01-02');
+assert.equal(run('careDetails(state.demoRequests[1]).reschedule.status'),'Declined');
+
+run('state.view="admin"');
+event('[data-demo-contact]',{demoContact:'demo-2'});
+event('[data-demo-assign]',{demoAssign:'demo-2'},{counselor:'rachel-kim'},'submit');
+event('[data-demo-schedule]',{demoSchedule:'demo-2'},{date:'2099-01-04',time:'16:00'},'submit');
+run('state.view="client"; state.activeRequestId="demo-1"');
+event('[data-reschedule-request]',{rescheduleRequest:'demo-1'},{date:'2099-01-04',time:'16:00',reason:'Demo schedule conflict'},'submit');
+run('state.view="admin"');
+event('[data-reschedule-approve]',{rescheduleApprove:'demo-1'});
+assert.equal(run('state.demoRequests[1].appointment.date'),'2099-01-02');
+assert.equal(run('careDetails(state.demoRequests[1]).reschedule.status'),'Pending');
+assert.match(run('state.notice'),/already has an appointment/);
+assert.equal(run('validDemoSlot("2099-99-99", "09:00")'),false);
+assert.equal(run('validDemoSlot("2099-02-30", "09:00")'),false);
+// Existing fictional fixtures have their own connected workspaces as well.
+run('state.view="counselor"; state.demoCounselorId="rachel-kim"; state.workspaceClientId=careRecords().find(r=>!r.demo && r.counselorId==="rachel-kim").id');
+const sampleId=run('state.workspaceClientId');
+event('[data-homework-assign]',{homeworkAssign:sampleId},{title:'Practice a sample breathing routine',due:''},'submit');
+run(`state.view="client"; state.activeRequestId="${sampleId}"`);
+assert.match(run('clientPortal()'),/Practice a sample breathing routine/);
+event('[data-homework-submit]',{homeworkSubmit:'homework-1',careClient:sampleId});
+assert.equal(run('careDetails(selectedCareRecord()).homework[0].status'),'Submitted');
+assert.equal(run('careDetails(state.demoRequests[0]).homework.length'),0);
+console.log('PASS: homework assignment/submission/review, intake, reminders, reschedule approval/decline, correct client identity, cross-client and counselor isolation, invalid dates.');

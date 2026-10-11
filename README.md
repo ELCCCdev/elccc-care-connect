@@ -75,3 +75,30 @@ With the dev server running, run `node scripts/check-responsive.mjs`. This optio
 Verified in headless Chromium at 100% zoom: 320, 375, 390, 480, 640, 768, 1024, 1280, 1440, and 1920px widths. All seven views, expanded navigation, and five dialog types were checked for horizontal overflow. Browser controls exercised the complete fictional request, admin review, counselor assignment, appointment scheduling, counselor visibility, and updated client status at mobile width. Menu expansion/Escape and dialog keyboard focus trapping passed, without JavaScript errors. Mobile and laptop Admin screenshots were visually inspected. The existing workflow harness, static build, and whitespace checks also pass.
 
 Testing limitations: Firefox, Safari/iOS, real touchscreen devices, on-screen keyboards, screen readers, high contrast modes, and an exhaustive WCAG audit were not tested. Viewport emulation does not substitute for those devices. New requests remain session-only, and refresh intentionally resets them. No deployment was run. The GitHub Pages workflow and build script are unchanged; the review branch is outside the existing `main`/`work` deployment triggers.
+
+## Phase 2: interactive counselor workspace and client portal
+
+The selected fictional client now controls the Client Portal greeting, appointment details, intake, homework, and confirmations. Existing sample clients and newly submitted requests retain separate in-memory activity records. Counselor selection filters assigned clients, schedules, workspace tasks, and rescheduling information. Sample appointment dates are retained as fixtures rather than replaced with invented live bookings.
+
+Counselors can open an assigned client's detailed workspace, assign preset homework with an optional future due date, review submitted homework, and complete or reopen a follow-up reminder. Clients submit preset sample intake answers and sample homework completion. Reschedule requests appear in the Admin CRM and assigned counselor's workspace; approval changes the shared appointment, while decline leaves it unchanged. Pending requests never replace the confirmed appointment. Approval rejects conflicting demo counselor slots.
+
+All actions are fictional and session-only. Refresh resets homework, intake, reminders, requests, and new appointments. There are no uploads, free-text clinical responses, authentication, medical records, external messages, or production integrations. Demo role selectors are presentation controls, not access security.
+
+### Manual testing
+
+1. Open Home, start a demo request for **Jordan Demo**, and submit it. In Admin CRM, mark it contacted, assign **Rachel Kim**, and schedule a future date at **09:00**.
+2. Open Counselor Dashboard, select **Rachel Kim**, and choose **Jordan Demo · demo-1** under **Assigned fictional client**. Verify the matching appointment, care status, pending intake, and follow-up reminder. You can also open a workspace using its **Open Workspace** button.
+3. Assign **Sample reflection exercise**, optionally choosing a future due date. Complete the reminder and confirm it changes to Completed; reopen it to test the reverse action.
+4. Open Client Portal and select **Jordan Demo · demo-1**. Confirm that the greeting and appointment match this client. Choose a preferred sample session and the sample orientation response, then submit intake. Submit the assigned sample homework.
+5. Return to Jordan's counselor workspace. Verify intake is submitted and homework status is Submitted. Choose **Mark Homework Reviewed**; confirm the client then sees Reviewed.
+6. In Jordan's Client Portal, request a different future date/time. Verify Pending is shown and the current appointment is unchanged. Check the assigned counselor's workspace and Admin CRM for the same request.
+7. In Admin CRM, approve it. Verify both client and counselor show the new appointment and Approved status. Submit another request and decline it; verify the confirmed appointment remains unchanged.
+8. Submit a request for **Taylor Example**. Switch between Jordan and Taylor in the portal and confirm their greeting, intake, homework, appointment, and confirmations remain separate. Switch counselors and verify Jordan is absent from unrelated counselor workspaces.
+9. Try approving a reschedule that conflicts with another appointment for the same counselor: approval should be blocked. Try past dates and incomplete intake selections. Check narrow mobile widths, keyboard navigation, role links, and Home.
+10. Refresh and confirm session data resets while the original fictional fixtures remain available.
+
+### Automated checks and limits
+
+Run `node scripts/check-workflow.mjs`, `node scripts/check-workspace.mjs`, and `npm run build`. With the preview server and test-environment Playwright/Chromium available, run `node scripts/check-responsive.mjs`.
+
+The workspace harness covers assignment/submission/review, intake, reminder completion, reschedule approval/decline, client identity, per-client and counselor separation, and invalid dates. Browser checks retain the original viewport/onboarding coverage and add the complete mobile intake/homework/rescheduling flow plus populated Client/Counselor/Admin layouts. Browser coverage remains Chromium only; Safari/iOS, Firefox, real devices, screen readers, and a full accessibility audit remain unverified. GitHub Pages configuration and the static build script are unchanged. Review only: do not automatically merge or deploy.

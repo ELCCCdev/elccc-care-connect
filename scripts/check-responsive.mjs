@@ -57,6 +57,40 @@ try {
  assert.match(await page.locator('main').innerText(),/Status: Scheduled/);
  assert.match(await page.locator('main').innerText(),/2099-01-01 at 09:00/);
  await noOverflow('mobile updated client');
+ // Phase 2 workspace and portal actions, all through real browser controls.
+ await page.getByLabel('Preferred demo session').selectOption('Evening');
+ await page.getByLabel('Sample orientation checklist').selectOption('Reviewed');
+ await page.getByRole('button',{name:'Submit Sample Intake',exact:true}).click();
+ await page.getByRole('button',{name:'3 · Counselor Dashboard',exact:true}).click();
+ await page.getByLabel('Assigned fictional client').selectOption('demo-1');
+ await page.getByLabel('Demo homework activity').selectOption('Sample reflection exercise');
+ await page.getByRole('button',{name:'Assign Demo Homework',exact:true}).click();
+ await page.getByRole('button',{name:'Complete Reminder',exact:true}).click();
+ await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ assert.match(await page.locator('.dashboard-hero').innerText(),/Welcome, Jordan Demo/);
+ await page.getByRole('button',{name:'Submit Sample Homework',exact:true}).click();
+ await page.getByLabel('Requested date').fill('2099-01-02');
+ await page.getByLabel('Requested time (Eastern Time)').selectOption('11:00');
+ await page.getByRole('button',{name:'Request Demo Reschedule',exact:true}).click();
+ await noOverflow('mobile client homework and pending reschedule');
+ await page.getByRole('button',{name:'3 · Counselor Dashboard',exact:true}).click();
+ await page.getByRole('button',{name:'Mark Homework Reviewed',exact:true}).click();
+ assert.match(await page.locator('main').innerText(),/Reschedule request: Pending/);
+ await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await page.getByRole('button',{name:'Approve Demo Reschedule',exact:true}).click();
+ await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ assert.match(await page.locator('main').innerText(),/2099-01-02 at 11:00/);
+ assert.match(await page.locator('main').innerText(),/Status: Reviewed/);
+ // Updated content stays responsive at every tested width, including workspace and queue.
+ for (const width of [320,375,768,1024,1440,1920]) {
+  await page.setViewportSize({width,height:900});
+  for (const view of ['client','counselor','admin']) {
+   await page.evaluate(view=>{state.view=view;render();},view);
+   await noOverflow(`${width}px populated ${view}`);
+  }
+ }
+ await page.setViewportSize({width:375,height:812});
+
  await page.getByRole('button',{name:'← Home',exact:true}).click();
  await page.getByRole('button',{name:'Menu',exact:true}).click();
  assert.equal(await page.getByRole('button',{name:'Menu',exact:true}).getAttribute('aria-expanded'),'true');
@@ -78,5 +112,5 @@ try {
   }
  }
  assert.deepEqual(errors,[]);
- console.log('PASS: 10 viewport widths × 7 pages, expanded navigation, 5 dialog types, mobile onboarding through all roles, menu Escape, dialog focus trapping; no horizontal overflow or JavaScript errors.');
+ console.log('PASS: 10 viewport widths × 7 pages, expanded navigation, 5 dialog types, mobile onboarding plus intake/homework/rescheduling through all roles, populated workspace layouts, menu Escape, dialog focus trapping; no horizontal overflow or JavaScript errors.');
 } finally {await browser.close();}
