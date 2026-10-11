@@ -13,7 +13,7 @@ async function primary(view) {const button=page.locator(`#primary-navigation [da
 try {
  await page.goto(url);
  await role('1 · Client Portal').click();await role('Start Another Demo Request').click();await role('Submit Fictional Request').click();await role('Review in Admin CRM').click();await role('Review & Mark Contacted').click();await page.getByLabel('Assign counselor').selectOption('rachel-kim');await role('Confirm Assignment').click();await page.getByLabel('Appointment date',{exact:false}).fill('2099-01-01');await role('Confirm Demo Appointment').click();
- await page.getByLabel('Center approval routing').selectOption('counselor');
+ await page.locator('[data-admin-panel=settings]').click();await page.getByLabel('Center approval routing').selectOption('counselor');
  await role('1 · Client Portal').click();await page.getByLabel('Requested date').fill('2099-01-02');await page.getByLabel('Requested time (Eastern Time)').selectOption('11:00');await role('Request Demo Reschedule').click();
  await role('2 · Admin CRM').click();assert.equal(await role('Approve Demo Reschedule').count(),0);
  await role('3 · Counselor Dashboard').click();await page.getByLabel('Alternative date').fill('2099-01-03');await page.getByLabel('Alternative time (Eastern Time)').selectOption('14:00');await role('Propose Alternative Time').click();
@@ -30,11 +30,11 @@ try {
  await page.locator('[data-diagnosis-save] [name=status]').selectOption('Confirmed');await page.locator('[data-diagnosis-save] [name=ack]').selectOption('manual');await role('Save Fictional Diagnosis & Plan').click();await role('Assign Goal-related Demo Homework').click();
  await role('1 · Client Portal').click();await page.getByLabel('Demo response (fictional text only)').fill('Fictional example: I tried the mock routine.');await role('Submit Sample Homework').click();
  await role('3 · Counselor Dashboard').click();await page.getByLabel('Fictional feedback',{exact:false}).fill('Fictional encouragement: review this mock goal next time.');await role('Save Fictional Feedback').click();
- await role('2 · Admin CRM').click();await page.getByLabel('Center approval routing').selectOption('configured');await page.locator('[data-client-routing] [name=client]').selectOption('demo-1');await page.getByLabel('Assigned approver',{exact:false}).selectOption('admin');await role('Save Demo Routing').click();
- await role('1 · Client Portal').click();await role('Request Demo Cancellation').click();await role('3 · Counselor Dashboard').click();assert.equal(await role('Approve Demo Cancellation').count(),0);await role('2 · Admin CRM').click();await role('Decline Demo Cancellation').click();
+ await role('2 · Admin CRM').click();await page.locator('[data-admin-panel=settings]').click();await page.getByLabel('Center approval routing').selectOption('configured');await page.locator('[data-client-routing] [name=client]').selectOption('demo-1');await page.getByLabel('Assigned approver',{exact:false}).selectOption('admin');await role('Save Demo Routing').click();
+ await role('1 · Client Portal').click();await role('Request Demo Cancellation').click();await role('3 · Counselor Dashboard').click();assert.equal(await role('Approve Demo Cancellation').count(),0);await role('2 · Admin CRM').click();await page.locator('[data-admin-panel=appointments]').first().click();await role('Decline Demo Cancellation').click();
  await role('1 · Client Portal').click();assert.match(await page.locator('main').innerText(),/Appointment: 2099-01-03 at 14:00/);assert.match(await page.locator('main').innerText(),/Fictional encouragement/);await page.locator('details summary').first().click();assert.match(await page.locator('main').innerText(),/Original: 2099-01-01 at 09:00/);assert.doesNotMatch(await page.locator('main').innerText(),/\bdemo-\d|sample-client-\d/);
  await primary('integrations');
- for(const name of ['EHR / Practice Management','Telehealth','Calendar & Scheduling','Billing & Insurance','Messaging & Reminders']) {
+ for(const name of ['Client care records','Video appointments','Appointment calendar','Payments & insurance','Appointment reminders']) {
   const card=page.locator('article').filter({has:page.getByRole('heading',{name,exact:true})});await card.getByRole('button',{name:'Enable Demo Simulation',exact:true}).click();await card.getByRole('button',{name:'Preview Simulated Sync',exact:true}).click();assert.match(await card.innerText(),/Zero records sent/);assert.match(await card.innerText(),/not connected/);
  }
  await primary('tour');assert.match(await page.locator('main').innerText(),/Stakeholder Demo Tour/);

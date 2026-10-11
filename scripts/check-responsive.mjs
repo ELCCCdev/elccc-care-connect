@@ -78,6 +78,7 @@ try {
  await page.getByRole('button',{name:'Mark Homework Reviewed',exact:true}).click();
  assert.match(await page.locator('main').innerText(),/Reschedule request: Pending/);
  await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await page.locator('[data-admin-panel=appointments]').first().click();
  await page.getByRole('button',{name:'Approve Demo Reschedule',exact:true}).click();
  await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
  assert.match(await page.locator('main').innerText(),/2099-01-02 at 11:00/);
@@ -87,12 +88,14 @@ try {
  assert.match(await page.locator('main').innerText(),/Cancellation request: Pending/);
  assert.match(await page.locator('main').innerText(),/Appointment: 2099-01-02 at 11:00/);
  await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await page.locator('[data-admin-panel=appointments]').first().click();
  await page.getByRole('button',{name:'Decline Demo Cancellation',exact:true}).click();
  await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
  assert.match(await page.locator('main').innerText(),/Cancellation request: Declined/);
  assert.match(await page.locator('main').innerText(),/Appointment: 2099-01-02 at 11:00/);
  await page.getByRole('button',{name:'Request Demo Cancellation',exact:true}).click();
  await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await page.locator('[data-admin-panel=appointments]').first().click();
  await page.getByRole('button',{name:'Approve Demo Cancellation',exact:true}).click();
  await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
  assert.match(await page.locator('main').innerText(),/Cancelled — no confirmed appointment/);

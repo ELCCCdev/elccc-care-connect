@@ -174,3 +174,47 @@ Tests cover original workflows, approver snapshots/restrictions, alternatives, a
 All state is in one page's JavaScript memory and resets on reload; separate tabs do not share it. Unsaved form drafts may be lost when changing views. History is an in-session demonstration, not a durable or tamper-resistant audit trail. No real patient data, PHI storage, authentication, clinical services, or external integrations are introduced. The existing GitHub Pages workflow and build script are unchanged; this feature branch does not trigger deployment.
 
 A production project would separately require server-enforced identity and role permissions, consent and privacy design, secured data storage and retention, audited change history, concurrent appointment reservations, real availability/timezone rules, clinician-reviewed/licensed assessments and coding processes, approved vendor contracts and credential handling, reliable notification delivery, and cross-browser/accessibility/security verification. Those capabilities are intentionally not implemented in this prototype.
+
+## Presentation readiness polish
+
+The Admin CRM now starts with **Overview**, followed by separate **Appointment Requests**, **Care Journey**, **Prayer Requests**, **Client Profiles**, **Approval Settings**, and **Sample Reports** work areas. Overview totals are calculated from their stated sources: session referrals and confirmed session appointments are separate from historical sample profiles. Pending decisions span fictional profiles; prayer follow-up counts include both historical and session queues. Historical chart data is illustrative, not live operational performance. Historical sample appointment dates are not counted as upcoming counselor appointments.
+
+### Stakeholder walkthrough
+
+1. Open **Demo Tour** from the main navigation. Use the Home/Client/Admin/Counselor role links throughout; they are simulated roles, not sign-in.
+2. From **Find a Counselor**, submit a preset fictional counseling request. Choose **Review in Admin CRM**. Under **Appointment Requests**, mark it contacted, assign a counselor, and schedule a future appointment. Alternatively, use **Create Fictional Referral** on a historical referral example to create an independent session copy; the archive remains unchanged.
+3. Return to **Overview** to verify the session referral and confirmed appointment counts. Historical center examples are available in the expandable activity area and **Sample Reports**.
+4. In **Client Profiles**, choose a fictional profile, expand its details, and complete an administrative follow-up. The feedback names that profile; switching profiles keeps follow-up state separate. Open its assigned counselor workspace when available.
+5. In **Approval Settings**, choose admin, counselor, or configured routing. In Client Portal request a reschedule or cancellation. Open **Appointment Requests** or the assigned counselor's daily operations to approve, decline, or propose an alternative. An alternative requires client acceptance and approver finalization. Confirm the original appointment stays intact until approval and inspect request history afterward. Overlapping slots and simulated unavailable hours remain rejected.
+6. In Counselor Dashboard, select the assigned client. Use the section links to jump to daily operations, homework, **Assessment & Screening**, or **Diagnosis & Treatment Planning**. Assign homework and an invented screening activity; complete them in the selected Client Portal and review them as the counselor.
+7. Screening scores never populate diagnosis documentation. In the separate treatment-planning section, only the simulated authorized clinician can manually author fictional documentation. Switch the workspace permission to care coordinator to demonstrate read-only restrictions. No diagnosis is generated or automatically assigned.
+8. In Admin **Prayer Requests**, submit a preset fictional prayer request, mark it prayed, and complete fictional follow-up. The queue and overview follow-up total update; no message is sent. Public prayer submission uses the same queue and only offers fictional presets.
+9. In **Integration Center**, inspect the plain-English purpose of each proposed connection, optionally expand technical information, save demo settings, enable a simulation, and preview it. Every connection remains explicitly **not connected** and sends **zero records**.
+10. Refresh the page to demonstrate that session-created referrals, prayers, follow-ups, assignments, and decisions reset. No browser storage or external service persists them.
+
+### Validation
+
+Run `npm run build`, then these Node regression checks:
+
+```sh
+node scripts/check-workflow.mjs
+node scripts/check-workspace.mjs
+node scripts/check-operations.mjs
+node scripts/check-presentation.mjs
+```
+
+With `npm run dev` running and Playwright plus Chromium available in the test environment:
+
+```sh
+node scripts/check-responsive.mjs
+node scripts/check-operations-browser.mjs
+node scripts/check-presentation-browser.mjs
+```
+
+Browser checks cover ten widths from 320 to 1920 pixels, existing role pages and dialogs, keyboard modal behavior, complete mobile onboarding/homework/appointment flows, clinical permissions, integration previews, prayer/profile actions, and all seven Admin areas at six widths. New presentation checks verify source-specific metrics, historical copies, isolated follow-ups, separate screening/planning, and tour navigation.
+
+### Remaining limitations
+
+This is a fictional presentation prototype. Permissions are client-side simulation controls and provide no security boundary. Date availability, reporting, scoring, diagnoses, feedback, and administrative follow-up are mock examples; they are not clinical services or validated instruments. Use fictional text only. Browser state lasts only in the current page, does not synchronize across tabs/devices, and resets on reload. There are no real connections, credentials, uploads, messages, insurance checks, payments, authentication, or protected health information storage. Static GitHub Pages configuration is unchanged.
+
+Automated browser validation uses local headless Chromium and simulated viewport sizes. Safari, Firefox, physical devices, screen-reader announcements, and stakeholder usability sessions require separate manual review. Future production use would require secure authentication and authorization, consent and privacy controls, protected storage, audit trails, clinical governance, validated/licensed assessments, accessibility review, and separately approved integrations.
