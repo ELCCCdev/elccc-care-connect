@@ -182,7 +182,7 @@ The Admin CRM now starts with **Overview**, followed by separate **Appointment R
 ### Stakeholder walkthrough
 
 1. Open **Demo Tour** from the main navigation. Use the Home/Client/Admin/Counselor role links throughout; they are simulated roles, not sign-in.
-2. From **Find a Counselor**, submit a preset fictional counseling request. Choose **Review in Admin CRM**. Under **Appointment Requests**, mark it contacted, assign a counselor, and schedule a future appointment. Alternatively, use **Create Fictional Referral** on a historical referral example to create an independent session copy; the archive remains unchanged.
+2. From **Find a Counselor**, submit a preset fictional counseling request. Choose **Switch to Administrator Demo**. Under **Appointment Requests**, mark it contacted, assign a counselor, and schedule a future appointment. Alternatively, use **Create Fictional Referral** on a historical referral example to create an independent session copy; the archive remains unchanged.
 3. Return to **Overview** to verify the session referral and confirmed appointment counts. Historical center examples are available in the expandable activity area and **Sample Reports**.
 4. In **Client Profiles**, choose a fictional profile, expand its details, and complete an administrative follow-up. The feedback names that profile; switching profiles keeps follow-up state separate. Open its assigned counselor workspace when available.
 5. In **Approval Settings**, choose admin, counselor, or configured routing. In Client Portal request a reschedule or cancellation. Open **Appointment Requests** or the assigned counselor's daily operations to approve, decline, or propose an alternative. An alternative requires client acceptance and approver finalization. Confirm the original appointment stays intact until approval and inspect request history afterward. Overlapping slots and simulated unavailable hours remain rejected.
@@ -218,3 +218,36 @@ Browser checks cover ten widths from 320 to 1920 pixels, existing role pages and
 This is a fictional presentation prototype. Permissions are client-side simulation controls and provide no security boundary. Date availability, reporting, scoring, diagnoses, feedback, and administrative follow-up are mock examples; they are not clinical services or validated instruments. Use fictional text only. Browser state lasts only in the current page, does not synchronize across tabs/devices, and resets on reload. There are no real connections, credentials, uploads, messages, insurance checks, payments, authentication, or protected health information storage. Static GitHub Pages configuration is unchanged.
 
 Automated browser validation uses local headless Chromium and simulated viewport sizes. Safari, Firefox, physical devices, screen-reader announcements, and stakeholder usability sessions require separate manual review. Future production use would require secure authentication and authorization, consent and privacy controls, protected storage, audit trails, clinical governance, validated/licensed assessments, accessibility review, and separately approved integrations.
+
+## Role-based welcome and demo navigation
+
+The prototype starts on a welcome screen with **I'm a Client**, **I'm a Counselor**, and **I'm an Administrator**. Each choice opens the existing role dashboard. **Explore Services or Request Care** opens the public counseling pages without selecting a dashboard role or signing in. Home returns to the welcome screen; Explore Services retains the original public experience.
+
+Navigation follows the selected presentation perspective:
+
+- Client: Client Portal, public counseling services, match quiz, resources, and the client-relevant tour steps. No Admin CRM, Integration Center, administrative reports, or counselor caseload links.
+- Counselor: Counselor Dashboard, public services/resources, and relevant tour steps. Administrator-only approval settings and integrations remain in the administrator perspective.
+- Administrator: Admin CRM, Integration Center, administrative sections, public pages, and the complete stakeholder tour. Tour steps that open another role explicitly identify the perspective switch.
+
+**Switch Demo Role** stays visible in the header, including when the mobile navigation is collapsed. Choose a role and continue; the current fictional session is retained. These controls provide presentation scoping only, not authentication, authorization, privacy, or security guarantees. Existing clinician and appointment approval checks remain simulated workflow rules.
+
+Client Portal displays a stable fictional reference next to the selected client's name. Taylor Hayes's historical sample reference is **ELCCC-10024**; session referrals use a separate **ELCCC-20001** series. IDs identify fictional records and are not login credentials. Switching clients updates the name, reference, appointment, intake, and activities together. Session references and state reset on reload.
+
+### Updated entry walkthrough
+
+1. Start with **Explore Services or Request Care** or **I'm a Client**. Use a preset fictional care request.
+2. After submission, **Track in Client Portal** opens the client perspective. **Switch to Administrator Demo** is an explicit presenter shortcut to the appointment review workflow.
+3. Mark contacted, assign a counselor, and schedule. Use **Switch Demo Role** to preview the assigned counselor and client perspectives; use the same selectors and activities described above.
+4. Switch to Administrator before opening approval settings, reports, or integration simulations. Continue the existing rescheduling, cancellation, homework, prayer, and clinical walkthroughs through their appropriate perspectives.
+5. Return Home to inspect the **New Client Journey**: inquiry, intake, counselor assignment, scheduling, and ongoing care. The same explanation is available on the public services page.
+
+All prior workflows remain available. Cross-role workflow navigation now uses explicit role switching instead of showing every dashboard link to every user. Public services no longer expose administrator dashboard shortcuts outside the administrator perspective. Existing prototype warnings and static GitHub Pages configuration remain unchanged.
+
+Additional regression checks:
+
+```sh
+node scripts/check-roles.mjs
+node scripts/check-roles-browser.mjs
+```
+
+Role checks cover welcome choices, navigation/tour scoping, visitor exploration, reference-ID isolation, session preservation, complete cross-role onboarding, keyboard switching, and six widths from 320 to 1920 pixels. The existing responsive suite now also includes the welcome screen (ten pages at ten widths) and updated role-dialog focus trapping. Browser testing remains local headless Chromium; Safari, Firefox, physical devices, screen-reader review, and the live Pages site were not tested. All data is fictional and lives only in page memory; no real credentials, clinical data, backend, or integrations were added.

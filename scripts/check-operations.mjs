@@ -67,5 +67,5 @@ run('state.view="counselor";state.demoCounselorId="melissa-smith"');event('[data
 run('state.demoCounselorId="rachel-kim"');event('[data-cancellation-approve]',{cancellationApprove:'demo-1'});assert.equal(run('selectedCareRecord().appointment'),null);
 run('careRecords(); state.sampleCare["sample-client-03"].appointment={date:"2099-01-10",time:"10:00"}');assert.match(run('clientProfileModal(clients[2])'),/2099-01-10 at 10:00/);
 run('state.view="integrations"');event('[data-integration-preview]',{integrationPreview:'ehr'});assert.match(run('integrationCenter()'),/Zero records sent/);
-assert.match(run('demoTour()'),/Screening|Clinical review/);
+run("state.demoRole='Admin'");assert.match(run('demoTour()'),/Screening|Clinical review/);
 console.log('PASS: approver snapshots, unauthorized role restrictions, alternatives, history, availability, conflicts, clinician restrictions, screening/diagnosis separation, treatment homework, feedback, identity and integration previews.');
