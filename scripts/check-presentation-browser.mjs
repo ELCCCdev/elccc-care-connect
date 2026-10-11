@@ -10,9 +10,10 @@ const url=process.env.PROTOTYPE_URL || 'http://127.0.0.1:4173/';
 page.on('request',r=>{if(!r.url().startsWith(new URL(url).origin))external.push(r.url());});
 const role=name=>page.getByRole('button',{name,exact:true});
 async function primary(view) {const button=page.locator(`#primary-navigation [data-view="${view}"]`);if(!await button.isVisible())await role('Menu').click();await button.click();}
+async function switchDemoRole(roleName){await page.getByRole('button',{name:'Switch Demo Role',exact:true}).click();const modal=page.locator('.modal-backdrop');await modal.locator(`[data-role="${roleName}"]`).click();await modal.locator('[data-login-continue]').click();}
 try {
  await page.goto(url);
- await role('2 · Admin CRM').click();
+ await switchDemoRole('Admin');
  assert.match(await page.locator('main').innerText(),/Fictional Center Snapshot/);
  await page.locator('[data-admin-panel=prayer]').first().click();
  await page.getByLabel('Fictional requester').selectOption('Morgan Sample');
@@ -37,12 +38,12 @@ try {
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth+1),false,`${width}px admin ${area}`);
   }
  }
- await role('3 · Counselor Dashboard').click();
+ await switchDemoRole('Counselor');
  await page.getByRole('link',{name:'Assessment & Screening',exact:true}).click();
  assert.equal(await page.locator('#area-assessment-screening [data-diagnosis-save]').count(),0);
  await page.getByRole('link',{name:'Diagnosis & Treatment Planning',exact:true}).click();
  assert.equal(await page.locator('#area-diagnosis-treatment-planning [data-assessment-assign]').count(),0);
- await primary('tour');await role('Open Intake coordination').click();
+ await switchDemoRole('Admin');await primary('tour');await role('Open Intake coordination').click();
  assert.equal(await page.locator('[data-admin-panel=appointments]').first().getAttribute('aria-current'),'page');
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
  console.log('PASS: presentation overview, prayer and profile actions, historical referral workflow, all seven Admin areas at six viewport widths, separate clinical navigation, guided tour routing; no browser errors or external requests.');
