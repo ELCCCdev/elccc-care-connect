@@ -20,12 +20,13 @@ async function noOverflow(label) {
  assert.equal(problems.document,false,`${label}: document overflow ${JSON.stringify(problems)}`);
  assert.deepEqual(problems.elements,[],`${label}: elements outside viewport`);
 }
+async function switchDemoRole(roleName){await page.getByRole('button',{name:'Switch Demo Role',exact:true}).click();const modal=page.locator('.modal-backdrop');await modal.locator(`[data-role="${roleName}"]`).click();await modal.locator('[data-login-continue]').click();}
 try {
  await page.goto(url);
  for(const width of [320,375,390,480,640,768,1024,1280,1440,1920]) {
   await page.setViewportSize({width,height:900});
-  for(const view of ['home','counselors','quiz','resources','client','counselor','admin','integrations','tour']) {
-   await page.evaluate(view=>{state.view=view; state.menuOpen=false;render();},view);
+  for(const view of ['welcome','home','counselors','quiz','resources','client','counselor','admin','integrations','tour']) {
+   await page.evaluate(view=>{state.demoRole={client:'Client',counselor:'Counselor',admin:'Admin',integrations:'Admin'}[view]||null;state.view=view; state.menuOpen=false;render();},view);
    await noOverflow(`${width}px ${view}`);
   }
   await page.evaluate(()=>{state.menuOpen=true;render();});
@@ -40,20 +41,20 @@ try {
  }
  // Exercise the complete connected workflow through browser controls at mobile width.
  await page.setViewportSize({width:375,height:812});
- await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ await switchDemoRole('Client');
  await page.getByRole('button',{name:'Start Another Demo Request'}).click();
  await page.getByRole('button',{name:'Submit Fictional Request'}).click();
- await page.getByRole('button',{name:'Review in Admin CRM'}).click();
+ await page.getByRole('button',{name:'Switch to Administrator Demo'}).click();
  await page.getByRole('button',{name:'Review & Mark Contacted'}).click();
  await page.getByLabel('Assign counselor').selectOption('rachel-kim');
  await page.getByRole('button',{name:'Confirm Assignment',exact:true}).click();
  await page.getByLabel('Appointment date').fill('2099-01-01');
  await page.getByRole('button',{name:'Confirm Demo Appointment'}).click();
  await noOverflow('mobile scheduled admin');
- await page.getByRole('button',{name:'3 · Counselor Dashboard',exact:true}).click();
+ await switchDemoRole('Counselor');
  await page.getByLabel('Demo counselor').selectOption('rachel-kim');
  assert.match(await page.locator('main').innerText(),/2099-01-01 at 09:00/);
- await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ await switchDemoRole('Client');
  assert.match(await page.locator('main').innerText(),/Status: Scheduled/);
  assert.match(await page.locator('main').innerText(),/2099-01-01 at 09:00/);
  await noOverflow('mobile updated client');
@@ -61,12 +62,12 @@ try {
  await page.getByLabel('Preferred demo session').selectOption('Evening');
  await page.getByLabel('Sample orientation checklist').selectOption('Reviewed');
  await page.getByRole('button',{name:'Submit Sample Intake',exact:true}).click();
- await page.getByRole('button',{name:'3 · Counselor Dashboard',exact:true}).click();
+ await switchDemoRole('Counselor');
  await page.getByLabel('Assigned fictional client').selectOption('demo-1');
  await page.getByLabel('Demo homework activity').selectOption('Sample reflection exercise');
  await page.getByRole('button',{name:'Assign Demo Homework',exact:true}).click();
  await page.getByRole('button',{name:'Complete Reminder',exact:true}).click();
- await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ await switchDemoRole('Client');
  assert.match(await page.locator('.dashboard-hero').innerText(),/Welcome, Jordan Demo/);
  await page.getByLabel('Demo response (fictional text only)').fill('In this fictional scenario, I practiced the sample routine.');
  await page.getByRole('button',{name:'Submit Sample Homework',exact:true}).click();
@@ -74,30 +75,30 @@ try {
  await page.getByLabel('Requested time (Eastern Time)').selectOption('11:00');
  await page.getByRole('button',{name:'Request Demo Reschedule',exact:true}).click();
  await noOverflow('mobile client homework and pending reschedule');
- await page.getByRole('button',{name:'3 · Counselor Dashboard',exact:true}).click();
+ await switchDemoRole('Counselor');
  await page.getByRole('button',{name:'Mark Homework Reviewed',exact:true}).click();
  assert.match(await page.locator('main').innerText(),/Reschedule request: Pending/);
- await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await switchDemoRole('Admin');
  await page.locator('[data-admin-panel=appointments]').first().click();
  await page.getByRole('button',{name:'Approve Demo Reschedule',exact:true}).click();
- await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ await switchDemoRole('Client');
  assert.match(await page.locator('main').innerText(),/2099-01-02 at 11:00/);
  assert.match(await page.locator('main').innerText(),/Status: Reviewed/);
  assert.match(await page.locator('main').innerText(),/In this fictional scenario, I practiced the sample routine/);
  await page.getByRole('button',{name:'Request Demo Cancellation',exact:true}).click();
  assert.match(await page.locator('main').innerText(),/Cancellation request: Pending/);
  assert.match(await page.locator('main').innerText(),/Appointment: 2099-01-02 at 11:00/);
- await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await switchDemoRole('Admin');
  await page.locator('[data-admin-panel=appointments]').first().click();
  await page.getByRole('button',{name:'Decline Demo Cancellation',exact:true}).click();
- await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ await switchDemoRole('Client');
  assert.match(await page.locator('main').innerText(),/Cancellation request: Declined/);
  assert.match(await page.locator('main').innerText(),/Appointment: 2099-01-02 at 11:00/);
  await page.getByRole('button',{name:'Request Demo Cancellation',exact:true}).click();
- await page.getByRole('button',{name:'2 · Admin CRM',exact:true}).click();
+ await switchDemoRole('Admin');
  await page.locator('[data-admin-panel=appointments]').first().click();
  await page.getByRole('button',{name:'Approve Demo Cancellation',exact:true}).click();
- await page.getByRole('button',{name:'1 · Client Portal',exact:true}).click();
+ await switchDemoRole('Client');
  assert.match(await page.locator('main').innerText(),/Cancelled — no confirmed appointment/);
  await page.getByRole('button',{name:'Start Another Demo Request',exact:true}).click();
  await page.locator('.modal-backdrop').getByLabel('Fictional client').selectOption('Taylor Example');
@@ -113,7 +114,7 @@ try {
  for (const width of [320,375,768,1024,1440,1920]) {
   await page.setViewportSize({width,height:900});
   for (const view of ['client','counselor','admin','integrations','tour']) {
-   await page.evaluate(view=>{state.view=view;render();},view);
+   await page.evaluate(view=>{state.demoRole={client:'Client',counselor:'Counselor',admin:'Admin',integrations:'Admin'}[view]||null;state.view=view;render();},view);
    await noOverflow(`${width}px populated ${view}`);
   }
  }
@@ -128,17 +129,17 @@ try {
  await page.getByRole('button',{name:'Switch Demo Role',exact:true}).click();
  const first=page.locator('.modal-backdrop button').first();
  await first.focus(); await page.keyboard.press('Shift+Tab');
- assert.equal(await page.evaluate(()=>document.activeElement.hasAttribute('data-login-continue')),true);
+ assert.equal(await page.evaluate(()=>document.activeElement.hasAttribute('data-visitor')),true);
  await page.keyboard.press('Tab'); assert.equal(await first.evaluate(el=>el===document.activeElement),true);
  await page.keyboard.press('Escape');
  if (process.env.QA_SCREENSHOTS) {
   for (const width of [375,1280]) {
    await page.setViewportSize({width,height:900});
-   await page.evaluate(()=>{state.view='admin';render();});
+   await page.evaluate(()=>{state.demoRole='Admin';state.view='admin';render();});
    await page.evaluate(()=>{window.scrollTo(0,0);});
    await page.screenshot({path:`work/admin-${width}.png`});
   }
  }
  assert.deepEqual(errors,[]);
- console.log('PASS: 10 viewport widths × 9 pages, expanded navigation, 5 dialog types, mobile onboarding plus intake/homework/rescheduling through all roles, populated workspace layouts, menu Escape, dialog focus trapping; no horizontal overflow or JavaScript errors.');
+ console.log('PASS: 10 viewport widths × 10 pages, expanded navigation, 5 dialog types, mobile onboarding plus intake/homework/rescheduling through all roles, populated workspace layouts, menu Escape, dialog focus trapping; no horizontal overflow or JavaScript errors.');
 } finally {await browser.close();}
