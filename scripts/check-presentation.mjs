@@ -40,5 +40,5 @@ assert.match(run('kanbanBoard()'),/Session-created referrals only/);
 assert.doesNotMatch(run('assessmentPanel(selectedCareRecord(),true)'),/data-diagnosis-save|Clinician-authored documentation/);
 assert.doesNotMatch(run('treatmentPanel(selectedCareRecord(),true)'),/data-assessment-assign/);
 assert.match(run('integrationCenter()'),/Client care records|Technical information/);
-assert.match(run('demoTour()'),/data-tour-admin/);
+run("state.demoRole='Admin'");assert.match(run('demoTour()'),/data-tour-admin/);
 console.log('PASS: overview metrics, fictional prayer submission and administrative permissions, isolated profile follow-up, historical referral copying, separate screening/planning, plain-English integrations, tour routing.');
