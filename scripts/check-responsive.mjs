@@ -24,7 +24,7 @@ try {
  await page.goto(url);
  for(const width of [320,375,390,480,640,768,1024,1280,1440,1920]) {
   await page.setViewportSize({width,height:900});
-  for(const view of ['home','counselors','quiz','resources','client','counselor','admin']) {
+  for(const view of ['home','counselors','quiz','resources','client','counselor','admin','integrations','tour']) {
    await page.evaluate(view=>{state.view=view; state.menuOpen=false;render();},view);
    await noOverflow(`${width}px ${view}`);
   }
@@ -109,7 +109,7 @@ try {
  // Updated content stays responsive at every tested width, including workspace and queue.
  for (const width of [320,375,768,1024,1440,1920]) {
   await page.setViewportSize({width,height:900});
-  for (const view of ['client','counselor','admin']) {
+  for (const view of ['client','counselor','admin','integrations','tour']) {
    await page.evaluate(view=>{state.view=view;render();},view);
    await noOverflow(`${width}px populated ${view}`);
   }
@@ -137,5 +137,5 @@ try {
   }
  }
  assert.deepEqual(errors,[]);
- console.log('PASS: 10 viewport widths × 7 pages, expanded navigation, 5 dialog types, mobile onboarding plus intake/homework/rescheduling through all roles, populated workspace layouts, menu Escape, dialog focus trapping; no horizontal overflow or JavaScript errors.');
+ console.log('PASS: 10 viewport widths × 9 pages, expanded navigation, 5 dialog types, mobile onboarding plus intake/homework/rescheduling through all roles, populated workspace layouts, menu Escape, dialog focus trapping; no horizontal overflow or JavaScript errors.');
 } finally {await browser.close();}
