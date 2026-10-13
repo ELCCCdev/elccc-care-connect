@@ -87,6 +87,25 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(response.json()['fictional_client_name'], name.strip())
         self.assertEqual(len(self.client.get('/api/inquiries').json()), 4)
 
+    def test_local_cors_and_disallowed_origins(self):
+        for origin in ['http://127.0.0.1:5500', 'http://localhost:5500']:
+            preflight = self.client.options('/api/inquiries', headers={
+                'Origin': origin, 'Access-Control-Request-Method': 'POST',
+                'Access-Control-Request-Headers': 'content-type'})
+            self.assertEqual(preflight.status_code, 200)
+            self.assertEqual(preflight.headers['access-control-allow-origin'], origin)
+            self.assertNotIn('access-control-allow-credentials', preflight.headers)
+            saved = self.client.post('/api/inquiries', json=self.payload, headers={'Origin': origin})
+            self.assertEqual(saved.status_code, 201)
+            self.assertEqual(saved.headers['access-control-allow-origin'], origin)
+            listed = self.client.get('/api/inquiries', headers={'Origin': origin})
+            self.assertEqual(listed.headers['access-control-allow-origin'], origin)
+        for origin in ['https://elcccdev.github.io', 'http://127.0.0.1:5501', 'https://example.com']:
+            response = self.client.options('/api/inquiries', headers={
+                'Origin': origin, 'Access-Control-Request-Method': 'POST'})
+            self.assertEqual(response.status_code, 400)
+            self.assertNotIn('access-control-allow-origin', response.headers)
+
     def test_database_errors_and_no_cors_access(self):
         with sqlite3.connect(self.database) as connection:
             connection.execute('DROP TABLE inquiries')

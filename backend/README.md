@@ -5,9 +5,10 @@ for real patient information. It has no authentication or authorization. Never
 enter real names, contact details, clinical information, or patient records. Do
 not expose it publicly or connect the GitHub Pages frontend to it.
 
-This separate FastAPI/SQLite backend leaves the existing frontend, branding,
-navigation, and Pages deployment untouched. No billing, telehealth, diagnosis,
-or external integrations are included. Phase 2 requires separate approval.
+This separate FastAPI/SQLite backend preserves the existing frontend design,
+branding, navigation, and Pages deployment. No billing, telehealth, diagnosis,
+or external service integrations are included. Phase 2 connects the local frontend
+inquiry form and Admin inquiry list only.
 
 ## Start and open the demo
 
@@ -64,7 +65,9 @@ the server.
    Health check: http://127.0.0.1:8000/health.
 
 Keep the loopback host shown above. Do not use `--host 0.0.0.0`, public hosting,
-or a public tunnel. No CORS access is enabled for the public frontend. Local
+or a public tunnel. CORS permits only `http://127.0.0.1:5500` and `http://localhost:5500` for GET/POST
+and the Content-Type header, without credentials. Public frontend origins are
+not allowed. CORS is a browser policy, not authentication or access control. Local
 isolation and fictional-data acknowledgment are not security or compliance
 controls that prevent someone from entering real information.
 
@@ -131,10 +134,9 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 ```
 
-Seven tests use disposable databases: demo/health responses, create/list/retrieve
+Eight tests use disposable databases: demo/health responses, create/list/retrieve
 and metadata, restart persistence without duplicate samples, validation/malformed
-JSON, missing/invalid IDs, SQL-like input and whitespace, and database errors/no
-cross-origin access. Tests do not change your demo database.
+JSON, missing/invalid IDs, SQL-like input and whitespace, database errors, and allowed/disallowed local CORS origins. Tests do not change your demo database.
 
 ## Troubleshooting
 
@@ -157,6 +159,6 @@ cross-origin access. Tests do not change your demo database.
 - `requirements.txt`: runtime dependencies; `requirements-dev.txt`: test dependency.
 - `data/`: generated SQLite database, ignored by Git.
 
-All root frontend files, scripts, and `.github/workflows/deploy.yml` remain
-unchanged. The existing build copies only its original frontend files and does
-not publish this backend or its data.
+The Phase 2 frontend integration is documented in the root README. The GitHub
+Pages deployment configuration remains unchanged, and the static build does not
+publish this backend or its data. Public Pages retains the static mock behavior.

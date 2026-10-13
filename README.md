@@ -251,3 +251,113 @@ node scripts/check-roles-browser.mjs
 ```
 
 Role checks cover welcome choices, navigation/tour scoping, visitor exploration, reference-ID isolation, session preservation, complete cross-role onboarding, keyboard switching, and six widths from 320 to 1920 pixels. The existing responsive suite now also includes the welcome screen (ten pages at ten widths) and updated role-dialog focus trapping. Browser testing remains local headless Chromium; Safari, Firefox, physical devices, screen-reader review, and the live Pages site were not tested. All data is fictional and lives only in page memory; no real credentials, clinical data, backend, or integrations were added.
+
+
+## Phase 2: local persistent counseling inquiries
+
+The Request Counseling form connects to the Phase 1 FastAPI backend **only** when
+opened at `http://127.0.0.1:5500` or `http://localhost:5500`. Public GitHub Pages
+and other origins retain the existing static fictional scenarios without calling
+the backend. No deployment changes are included.
+
+This is a local, fictional-data development prototype. Never enter real client
+or patient information. There is no authentication, authorization, or HIPAA
+compliance. CORS permits only those two local frontend origins; it is not an
+access-control boundary.
+
+### Start locally on a Mac
+
+Use two Terminal windows. Select branch `codex/elccc-backend-phase-2` in your
+existing clone first (`git fetch origin`, then `git switch codex/elccc-backend-phase-2`).
+
+In Terminal 1, from the repository's `backend/` directory (Python 3.9+):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+In Terminal 2, from the repository root:
+
+```bash
+python3 -m http.server 5500 --bind 127.0.0.1
+```
+
+If Live Server is already serving the repository at port 5500, keep using it
+instead of starting another frontend server. Leave both servers running. Open
+**http://127.0.0.1:5500**. Restart the backend after pulling the CORS changes.
+
+### Create and review a persistent fictional inquiry
+
+1. Choose **Explore Services or Request Care**, then **Find a Counselor**.
+   Choose an available counselor's **Request Counseling** button.
+2. Choose a preset fictional client, support pathway, session format, and contact
+   preference. Check the fictional-data confirmation and click **Submit Fictional
+   Request** once.
+3. Wait for **Saved to the local development database** and its inquiry UUID.
+   Failed requests show an error and do not create a pretend successful referral.
+4. Click **Switch to Administrator Demo**, or switch demo role to Administrator,
+   then open **Appointment Requests**. The **Saved fictional inquiries** section
+   loads SQLite records, including the three Phase 1 samples and your new inquiry.
+5. Refresh the browser. Select Administrator and Appointment Requests again. The
+   inquiry and its UUID remain. **Refresh saved inquiries** retrieves current
+   records, including inquiries created through `/demo` or another browser tab.
+6. Stop/restart the backend with the same database and refresh the inquiry list.
+   Saved inquiries still remain; records are stored at `backend/data/inquiries.sqlite3`.
+
+Only these supported fields are sent:
+
+| Frontend field | Backend field / mapping |
+| --- | --- |
+| Preset fictional client | `fictional_client_name` |
+| Anxiety or Grief pathway | `category: individual` |
+| Marriage pathway | `category: couples` |
+| Children pathway | `category: family` |
+| Contact preference selector | `preferred_contact_method: email` or `phone` |
+| Required fictional-data checkbox | `fictional_data_only: true` |
+
+Preferred counselor and session format are **not sent** to the backend. UUID,
+initial status `new`, and timestamp are assigned by the server. Existing review,
+assignment, scheduling, care activities, and historical scenarios remain session
+simulations; their changes do not update SQLite inquiry statuses. Reloading the
+page resets those simulated activities while keeping the saved inquiry list.
+
+If the backend is unavailable, start it and retry. If a POST times out, check the
+saved list before resubmitting: the server may have saved it before the response
+was lost. GET failures keep previously loaded rows and label them potentially
+stale. This phase has no automatic retries or persistent scheduling.
+
+### Tests
+
+Backend tests (from `backend/`, with the virtual environment active):
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -v
+```
+
+Frontend regression checks (from the repository root, with Node installed):
+
+```bash
+node scripts/check-workflow.mjs
+node scripts/check-workspace.mjs
+node scripts/check-operations.mjs
+node scripts/check-presentation.mjs
+node scripts/check-roles.mjs
+```
+
+Optional end-to-end browser check: stop servers using ports 5500, 5501, and 8000.
+From the repository root, use a Python environment with the backend test dependencies:
+
+```bash
+python -m pip install -r backend/requirements-dev.txt playwright
+python -m playwright install chromium
+python scripts/check-backend-integration.py
+```
+
+The script starts local frontend/backend servers with a disposable SQLite file
+and shuts them down afterward. It checks exact payload mapping, CORS, Admin
+retrieval, refresh/restart persistence, backend/network error handling, and static
+origin isolation. It does not touch your demonstration database.

@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -89,6 +90,14 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
 
     app = FastAPI(title='ELCCC Care Connect — DEVELOPMENT ONLY', lifespan=lifespan,
                   description='Local prototype for fictional data only. Not HIPAA-ready.')
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=['http://127.0.0.1:5500', 'http://localhost:5500'],
+        allow_methods=['GET', 'POST'],
+        allow_headers=['Content-Type'],
+        allow_credentials=False,
+    )
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
