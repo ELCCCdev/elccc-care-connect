@@ -5,7 +5,7 @@ import logging
 import os
 from pathlib import Path
 import sqlite3
-from typing import Literal
+from typing import Literal, Optional
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, HTTPException, Request
@@ -38,7 +38,7 @@ class Inquiry(BaseModel):
     created_at: datetime
 
 
-def create_app(db_path: Path | None = None, *, seed: bool = True) -> FastAPI:
+def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
     """Factory allows tests to use disposable SQLite files."""
     database = Path(db_path) if db_path is not None else Path(
         os.environ.get('ELCCC_DB_PATH', str(BACKEND_DIR / 'data' / 'inquiries.sqlite3'))

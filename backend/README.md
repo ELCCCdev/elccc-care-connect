@@ -11,8 +11,14 @@ or external integrations are included. Phase 2 requires separate approval.
 
 ## Start and open the demo
 
-You need Python **3.10 or newer**, Git, and a terminal. SQLite comes with Python;
+You need Python **3.9 or newer**, Git, and a terminal. SQLite comes with Python;
 you do not need a database server.
+
+The dependency pins support Python 3.9, including macOS Python 3.9.6. Pydantic
+2 is required by the models; pip selects transitive dependencies compatible with
+your Python version. If updating an existing installation, activate its virtual
+environment and rerun `python -m pip install -r requirements.txt` before starting
+the server.
 
 1. Clone the repository (or use your existing clone) and select the branch:
 

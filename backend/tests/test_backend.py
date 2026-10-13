@@ -35,7 +35,7 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         inquiry = response.json()
         UUID(inquiry['inquiry_id'])
-        self.assertIsNotNone(datetime.fromisoformat(inquiry['created_at']).tzinfo)
+        self.assertIsNotNone(datetime.fromisoformat(inquiry['created_at'].replace('Z', '+00:00')).tzinfo)
         self.assertEqual(inquiry['status'], 'new')
         self.assertEqual(inquiry['fictional_client_name'], self.payload['fictional_client_name'])
         self.assertIn(inquiry, self.client.get('/api/inquiries').json())
