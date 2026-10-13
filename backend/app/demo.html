@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELCCC Care Connect — DEVELOPMENT DEMO</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;background:#f3f6f5;color:#173e38;margin:0}main{max-width:1050px;margin:auto;padding:28px}h1{font-size:2rem}h2{font-size:1.3rem}.warning{background:#fff0ca;border:2px solid #986600;padding:18px;border-radius:10px}.card{background:white;padding:24px;margin:24px 0;border:1px solid #ccd9d4;border-radius:12px}label{display:block;margin:14px 0 5px}input:not([type=checkbox]),select{box-sizing:border-box;width:100%;max-width:480px;padding:10px;font:inherit;border:1px solid #738d85;border-radius:5px}button{padding:10px 18px;background:#175e50;color:white;border:0;border-radius:5px;font:inherit;cursor:pointer}button:disabled{opacity:.6}button:focus-visible,a:focus-visible{outline:3px solid #bb7000;outline-offset:3px}.scroll{overflow:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px;border-bottom:1px solid #dde5e1}small{display:block;overflow-wrap:anywhere}#message{min-height:24px}a{color:#175e50}
+</style>
+</head>
+<body><main>
+<p>ELCCC Care Connect · Phase 1 local backend</p>
+<h1>DEVELOPMENT DEMO</h1>
+<div class="warning"><strong>Fictional data only. Never enter real client or patient information.</strong><br>This local development prototype is not HIPAA-ready and has no authentication or authorization. Do not expose it publicly.</div>
+<section class="card"><h2>Submit a fictional inquiry</h2>
+<p>Use a made-up name such as “Demo Robin Orchard.” No email address, phone number, or clinical details are collected.</p>
+<form id="inquiry-form">
+<label for="name">Fictional client name</label><input id="name" name="fictional_client_name" required minlength="2" maxlength="80" placeholder="Demo Robin Orchard" autocomplete="off">
+<label for="category">Counseling interest</label><select id="category" name="category"><option value="individual">Individual</option><option value="couples">Couples</option><option value="family">Family</option><option value="general">General information</option></select>
+<label for="contact">Preferred contact method (preference only)</label><select id="contact" name="preferred_contact_method"><option value="email">Email</option><option value="phone">Phone</option></select>
+<label><input id="fictional" type="checkbox" required> I confirm all information is fictional demonstration data.</label>
+<button id="submit" type="submit">Save fictional inquiry</button>
+</form><p id="message" role="status" aria-live="polite"></p>
+</section>
+<section class="card"><h2>Saved fictional inquiries</h2><p>Saved in local SQLite. Refresh this page or restart the server to verify they remain.</p>
+<button id="refresh" type="button">Refresh inquiries</button><p id="list-message" role="status" aria-live="polite"></p>
+<div class="scroll"><table><thead><tr><th>Fictional client / ID</th><th>Interest</th><th>Contact preference</th><th>Status</th><th>Created</th></tr></thead><tbody id="inquiries"></tbody></table></div>
+</section><p><a href="/docs">API documentation</a> · <a href="/health">Health check</a></p>
+</main>
+<script>
+const form=document.querySelector('#inquiry-form'),message=document.querySelector('#message'),listMessage=document.querySelector('#list-message'),submit=document.querySelector('#submit');
+async function request(url,options){
+  const response=await fetch(url,options); const data=await response.json();
+  if(!response.ok){throw new Error(typeof data.detail==='string'?data.detail+(data.errors?' '+data.errors.map(e=>e.field+': '+e.message).join('; '):''):'Request failed. Please retry.');}return data;
+}
+async function load(){
+  try{const records=await request('/api/inquiries');const rows=document.querySelector('#inquiries');rows.replaceChildren();
+    for(const inquiry of records){const row=document.createElement('tr');
+      for(const value of [inquiry.fictional_client_name,inquiry.category,inquiry.preferred_contact_method,inquiry.status,new Date(inquiry.created_at).toLocaleString()]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}
+      const id=document.createElement('small');id.textContent=inquiry.inquiry_id;row.firstChild.append(id);rows.append(row);
+    }listMessage.textContent=records.length+' fictional inquiries saved.';
+  }catch(error){listMessage.textContent='Could not load inquiries: '+error.message;}
+}
+form.addEventListener('submit',async event=>{
+  event.preventDefault();submit.disabled=true;message.textContent='Saving…';
+  try{await request('/api/inquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fictional_client_name:form.elements.fictional_client_name.value,category:form.elements.category.value,preferred_contact_method:form.elements.preferred_contact_method.value,fictional_data_only:document.querySelector('#fictional').checked})});form.reset();message.textContent='Saved to SQLite. Refresh the page to verify persistence.';await load();}
+  catch(error){message.textContent='Could not save inquiry: '+error.message;}finally{submit.disabled=false;}
+});
+document.querySelector('#refresh').addEventListener('click',load);load();
+</script></body></html>
