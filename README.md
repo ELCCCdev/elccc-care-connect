@@ -473,3 +473,73 @@ Conversion is one-way in this prototype. Assignment, appointments, care activiti
 and historical Client Profiles remain unrelated session simulations; conversion
 moves records between the new persistent sections, not into those mock profiles.
 No deployment or merge is performed by these setup commands.
+
+
+## Phase 3.5: frontend refinement
+
+Use branch **codex/elccc-frontend-phase-3-5** to review the refined interface.
+From your existing repository root on a Mac:
+
+```bash
+git fetch origin
+git switch codex/elccc-frontend-phase-3-5
+git pull --ff-only origin codex/elccc-frontend-phase-3-5
+cd backend
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+In a second Terminal, from the repository root:
+
+```bash
+python3 -m http.server 5500 --bind 127.0.0.1
+```
+
+Use your existing Live Server instead if port 5500 is already serving the project.
+Open **http://127.0.0.1:5500** and hard refresh with **Command+Shift+R**.
+Stop the previous backend before starting another one. The existing database is
+reused; do not delete or reset it. No backend code, schema, routes, or dependencies
+change in this phase.
+
+Admin CRM now has five main areas: **Overview, Clients, Appointments, Care Journey,
+and Reports**. Within **Clients**, choose **Prospective Clients**, **Established
+Clients**, or **Sample Profiles**. Prayer Requests remain available from Overview.
+Approval Settings is hidden, including its former panel route; the routing
+implementation and existing behavior remain available for future development.
+
+Open a prospective profile, save its MYIO invitation tracking, and use **Convert
+to Client → Confirm Conversion**. The established profile keeps the same inquiry
+reference and history. Open **Original inquiry details** to inspect the original
+UTC timestamp and status. Invitation tracking and conversion remain independent.
+Client and Counselor section links are shorter and preserve their original section
+anchors and forms. Shared button, spacing, and responsive styles retain the ELCCC
+palette and branding.
+
+The top notice still requires fictional data. **About this demonstration** in the
+footer explains authentication/security limitations and disconnected integrations.
+The portal tracking form explicitly states that no invitations are sent or account
+activation verified. Appointment and care activities remain session simulations.
+This prototype is not HIPAA-ready; use no real client or patient information.
+
+Verification:
+
+```bash
+# From backend/, with the virtual environment active
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -v
+
+# From the repository root
+node scripts/check-refinement.mjs
+node scripts/check-workflow.mjs
+node scripts/check-workspace.mjs
+node scripts/check-operations.mjs
+node scripts/check-presentation.mjs
+node scripts/check-roles.mjs
+```
+
+The existing browser integration command also checks grouped navigation, conversion,
+independent invitation tracking, history, and refresh/restart persistence. Its
+setup is documented above. Hidden routing settings are seeded directly in browser
+regression fixtures, while the retained implementation is checked separately; no
+hidden settings are exposed to users. No deployment or merge is included.

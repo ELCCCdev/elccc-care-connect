@@ -112,7 +112,7 @@ run('state.view="admin"');
 event('[data-cancellation-approve]',{cancellationApprove:sampleId});
 assert.equal(run('selectedCareRecord().appointment'),null);
 assert.equal(run('careDetails(selectedCareRecord()).cancelled'),true);
-assert.match(run('demoRequestSummary(selectedCareRecord())'),/Cancelled — no confirmed appointment/);
+assert.match(run('demoRequestSummary(selectedCareRecord())'),/Cancelled. No confirmed appointment/);
 assert.match(run('clientPortal()'),/Original sample fixture/);
 run('state.activeRequestId="demo-2"');
 assert.match(run('clientPortal()'),/Connected fictional request/);

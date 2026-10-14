@@ -95,7 +95,10 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='Refresh saved inquiries').click()
             panel.get_by_text('4 saved fictional inquiries.', exact=True).wait_for()
             assert inquiry_id in panel.inner_text()
+            assert page.locator('[aria-label="Admin work areas"] button').all_text_contents() == ['Overview','Clients','Appointments','Care Journey','Reports']
+            assert page.locator('[data-admin-panel=settings]').count() == 0
             # Phase 3: independent invitation tracking, confirmed conversion, and history.
+            page.get_by_role('button', name='Clients', exact=True).click()
             page.get_by_role('button', name='Established Clients', exact=True).click()
             page.get_by_text('No established fictional clients yet.', exact=True).wait_for()
             page.get_by_role('button', name='Prospective Clients', exact=True).click()
@@ -124,10 +127,11 @@ with tempfile.TemporaryDirectory() as temp:
             assert page.locator('[data-management-open="' + inquiry_id + '"]').count() == 0
             page.reload()
             open_admin()
+            page.get_by_role('button', name='Clients', exact=True).click()
             page.get_by_role('button', name='Established Clients', exact=True).click()
             page.get_by_text('1 established fictional clients.', exact=True).wait_for()
             page.locator('[data-management-open="' + inquiry_id + '"]').click()
-            profile.get_by_role('heading', name='Jordan Demo — fictional profile').wait_for()
+            profile.get_by_role('heading', name='Jordan Demo profile').wait_for()
             assert profile.get_by_label('MYIO invitation tracking (simulated)').input_value() == 'Activated'
             stop(backend)
             backend = start([BACKEND_PYTHON, '-m', 'uvicorn', 'app.main:app', '--host',
@@ -140,7 +144,14 @@ with tempfile.TemporaryDirectory() as temp:
             for width in [320, 375, 1280]:
                 page.set_viewport_size({'width': width, 'height': 900})
                 assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), width
+                assert page.locator('[data-managed-record] h3').first.bounding_box()['height'] < 80, 'Client name must remain readable'
             page.set_viewport_size({'width': 1280, 'height': 900})
+            if os.environ.get('QA_SCREENSHOTS'):
+                (ROOT / 'work').mkdir(exist_ok=True)
+                page.screenshot(path=str(ROOT / 'work' / 'refined-established.png'), full_page=True)
+                page.set_viewport_size({'width': 375, 'height': 900})
+                page.screenshot(path=str(ROOT / 'work' / 'refined-established-mobile.png'), full_page=True)
+                page.set_viewport_size({'width': 1280, 'height': 900})
             # Profile/list errors are shown without inventing records.
             page.route('**/api/clients', lambda route: route.fulfill(status=503,
                        content_type='application/json', body='{"detail":"Database unavailable"}'))

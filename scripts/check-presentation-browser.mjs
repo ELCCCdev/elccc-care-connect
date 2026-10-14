@@ -22,7 +22,7 @@ try {
  await page.locator('[data-prayer-action][data-action=prayed]').first().click();
  await page.locator('[data-prayer-action][data-action=followed]').first().click();
  assert.match(await page.locator('main').innerText(),/Follow-up Completed/);
- await page.locator('[data-admin-panel=clients]').click();
+ await page.getByRole('button',{name:'Clients',exact:true}).click();await page.locator('[data-admin-panel=clients]').click();
  await role('View Profile Details').click();await role('Complete Administrative Follow-up').click();
  assert.match(await page.locator('main').innerText(),/No external message was sent/);
  await page.getByLabel('Admin fictional profile').selectOption('sample-'+await page.evaluate(()=>clients[1].id));
@@ -33,18 +33,20 @@ try {
  assert.match(await page.locator('main').innerText(),/Contacted/);
  for(const width of [320,375,768,1024,1440,1920]){
   await page.setViewportSize({width,height:900});
-  for(const area of ['overview','appointments','pipeline','prayer','clients','settings','reports']){
+  for(const area of ['overview','appointments','pipeline','prayer','clients','reports']){
+   if(area==='clients')await role('Clients').click();
+   if(area==='prayer')await page.locator('[data-admin-panel=overview]').click();
    await page.locator(`[data-admin-panel=${area}]`).first().click();
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth+1),false,`${width}px admin ${area}`);
   }
  }
  await switchDemoRole('Counselor');
- await page.getByRole('link',{name:'Assessment & Screening',exact:true}).click();
+ await page.getByRole('link',{name:'Screening',exact:true}).click();
  assert.equal(await page.locator('#area-assessment-screening [data-diagnosis-save]').count(),0);
- await page.getByRole('link',{name:'Diagnosis & Treatment Planning',exact:true}).click();
+ await page.getByRole('link',{name:'Treatment Planning',exact:true}).click();
  assert.equal(await page.locator('#area-diagnosis-treatment-planning [data-assessment-assign]').count(),0);
  await switchDemoRole('Admin');await primary('tour');await role('Open Intake coordination').click();
  assert.equal(await page.locator('[data-admin-panel=appointments]').first().getAttribute('aria-current'),'page');
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
- console.log('PASS: presentation overview, prayer and profile actions, historical referral workflow, all seven Admin areas at six viewport widths, separate clinical navigation, guided tour routing; no browser errors or external requests.');
+ console.log('PASS: presentation overview, prayer and profile actions, historical referral workflow, grouped Admin areas at six viewport widths, separate clinical navigation, guided tour routing; no browser errors or external requests.');
 }finally{await browser.close();}

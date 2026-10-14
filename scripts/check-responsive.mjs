@@ -99,7 +99,7 @@ try {
  await page.locator('[data-admin-panel=appointments]').first().click();
  await page.getByRole('button',{name:'Approve Demo Cancellation',exact:true}).click();
  await switchDemoRole('Client');
- assert.match(await page.locator('main').innerText(),/Cancelled — no confirmed appointment/);
+ assert.match(await page.locator('main').innerText(),/Cancelled. No confirmed appointment/);
  await page.getByRole('button',{name:'Start Another Demo Request',exact:true}).click();
  await page.locator('.modal-backdrop').getByLabel('Fictional client').selectOption('Taylor Example');
  await page.getByRole('button',{name:'Submit Fictional Request',exact:true}).click();
