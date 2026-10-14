@@ -543,3 +543,20 @@ independent invitation tracking, history, and refresh/restart persistence. Its
 setup is documented above. Hidden routing settings are seeded directly in browser
 regression fixtures, while the retained implementation is checked separately; no
 hidden settings are exposed to users. No deployment or merge is included.
+
+## Native scheduling and intake direction
+
+ELCCC Care Connect is planning an ELCCC-native booking and intake experience,
+potentially replacing Calendly rather than embedding it. The [review and phased
+implementation plan](docs/NATIVE_SCHEDULING_PLAN.md) distinguishes persistent
+features from session simulations and covers appointment types, availability,
+time zones, intake, confirmations, changes, reminders, identity, conflict prevention,
+privacy, and a controlled cutover. Valant/MYIO evaluation remains separate.
+
+Review branch `codex/elccc-native-scheduling-plan` using the same local commands
+as Phase 3.5 after `git fetch origin` and `git switch codex/elccc-native-scheduling-plan`.
+Open Admin CRM → Appointments → **Scheduling and intake direction**, or Client
+Workspace → Intake → **Future native intake**. Both notes are expandable to keep
+the working interface compact. The calendar preview now describes native booking
+with optional synchronization. No live scheduling, new intake collection, database
+migration, external connection, notification delivery, deployment, or merge is added.
