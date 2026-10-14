@@ -95,6 +95,59 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='Refresh saved inquiries').click()
             panel.get_by_text('4 saved fictional inquiries.', exact=True).wait_for()
             assert inquiry_id in panel.inner_text()
+            # Phase 3: independent invitation tracking, confirmed conversion, and history.
+            page.get_by_role('button', name='Established Clients', exact=True).click()
+            page.get_by_text('No established fictional clients yet.', exact=True).wait_for()
+            page.get_by_role('button', name='Prospective Clients', exact=True).click()
+            page.get_by_text('4 prospective fictional clients.', exact=True).wait_for()
+            page.locator('[data-management-open="' + inquiry_id + '"]').click()
+            profile = page.locator('[data-managed-profile]')
+            profile.get_by_text('Not converted to client.', exact=True).wait_for()
+            profile.get_by_label('MYIO invitation tracking (simulated)').select_option('Sent')
+            profile.get_by_role('button', name='Save invitation tracking').click()
+            page.get_by_text('Invitation tracking saved locally.', exact=False).wait_for()
+            profile.get_by_role('button', name='Convert to Client', exact=True).click()
+            profile.get_by_role('button', name='Cancel Conversion', exact=True).click()
+            profile.get_by_text('Not converted to client.', exact=True).wait_for()
+            profile.get_by_role('button', name='Convert to Client', exact=True).click()
+            profile.get_by_role('button', name='Confirm Conversion', exact=True).click()
+            page.get_by_text('Conversion saved.', exact=False).wait_for()
+            assert page.evaluate('state.activeAdminPanel') == 'established'
+            assert inquiry_id in profile.inner_text()
+            assert profile.get_by_label('MYIO invitation tracking (simulated)').input_value() == 'Sent'
+            assert profile.get_by_role('button', name='Convert to Client', exact=True).count() == 0
+            assert 'Converted to client' in profile.inner_text()
+            profile.get_by_label('MYIO invitation tracking (simulated)').select_option('Activated')
+            profile.get_by_role('button', name='Save invitation tracking').click()
+            page.get_by_text('Invitation tracking saved locally.', exact=False).wait_for()
+            page.get_by_role('button', name='Prospective Clients', exact=True).click()
+            assert page.locator('[data-management-open="' + inquiry_id + '"]').count() == 0
+            page.reload()
+            open_admin()
+            page.get_by_role('button', name='Established Clients', exact=True).click()
+            page.get_by_text('1 established fictional clients.', exact=True).wait_for()
+            page.locator('[data-management-open="' + inquiry_id + '"]').click()
+            profile.get_by_role('heading', name='Jordan Demo — fictional profile').wait_for()
+            assert profile.get_by_label('MYIO invitation tracking (simulated)').input_value() == 'Activated'
+            stop(backend)
+            backend = start([BACKEND_PYTHON, '-m', 'uvicorn', 'app.main:app', '--host',
+                             '127.0.0.1', '--port', '8000'], ROOT / 'backend', env,
+                            'http://127.0.0.1:8000/health')
+            page.get_by_role('button', name='Refresh client lists').click()
+            page.get_by_text('1 established fictional clients.', exact=True).wait_for()
+            assert inquiry_id in profile.inner_text()
+            assert 'MYIO tracking updated' in profile.inner_text()
+            for width in [320, 375, 1280]:
+                page.set_viewport_size({'width': width, 'height': 900})
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), width
+            page.set_viewport_size({'width': 1280, 'height': 900})
+            # Profile/list errors are shown without inventing records.
+            page.route('**/api/clients', lambda route: route.fulfill(status=503,
+                       content_type='application/json', body='{"detail":"Database unavailable"}'))
+            page.get_by_role('button', name='Refresh client lists').click()
+            page.get_by_text('Could not load client lists.', exact=False).wait_for()
+            page.unroute('**/api/clients')
+            open_admin()
             # Failed POST does not fabricate a saved record; the user can retry.
             page.route('**/api/inquiries', lambda route: route.fulfill(status=422,
                        content_type='application/json', body=json.dumps({'detail':'Fictional validation failure'}))
@@ -124,7 +177,7 @@ with tempfile.TemporaryDirectory() as temp:
             assert not any(':8000' in url for url in requests)
             assert not errors, errors
             browser.close()
-        print('PASS: local CORS POST/GET, exact schema, persistent Admin list, refresh/restart, validation/network failures, no false saves, and static-origin isolation.')
+        print('PASS: local CORS POST/GET, exact schema, persistent Admin list, refresh/restart, validation/network failures, no false saves, static-origin isolation, Phase 3 navigation, confirmation/cancellation, independent portal tracking, history, and conversion refresh/restart persistence.')
     finally:
         for process in reversed(processes):
             stop(process)

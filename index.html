@@ -1,7 +1,7 @@
 <!doctype html> <html lang="en"> <head> <meta charset="UTF-8" /> <meta name="viewport" content="width=device-width, initial-scale=1.0" /> <title>ELCCC Care Connect</title> <style>
 .welcome-screen{max-width:1100px;margin:auto;padding:clamp(1rem,3vw,2.5rem)}.welcome-intro{max-width:720px;margin-bottom:1.5rem}.welcome-intro h1{font-size:clamp(2rem,5vw,3.3rem);line-height:1.15}.welcome-roles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}.welcome-roles .role-card{font:inherit;color:var(--ink);min-width:0;min-height:150px;text-align:left;padding:1.5rem;display:flex;flex-direction:column;gap:.8rem}.welcome-roles strong{font-size:1.3rem}.visitor-card{margin:1.5rem 0;padding:1.5rem;background:#f5f8ef;border-radius:1rem}.journey-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1rem;padding-left:1.5rem}.journey-list li{padding:.5rem}.journey-list p{font-size:.95rem}.demo-role-switch{min-height:44px;white-space:normal}@media(max-width:760px){.welcome-roles{grid-template-columns:1fr}.welcome-roles .role-card{min-height:110px}.journey-list{grid-template-columns:1fr}.site-header .demo-role-switch{max-width:160px}}
 
-.panel{scroll-margin-top:1rem}.admin-tabs a{display:inline-flex;align-items:center;min-height:44px}.admin-tabs{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}.admin-tabs button{min-height:44px}.button-row{display:flex;flex-wrap:wrap;gap:.5rem}.care-plan button{margin:.25rem}.overview-list{display:grid;gap:.75rem}details{margin:.75rem 0}summary{cursor:pointer;min-height:44px;padding:.5rem}
+[data-managed-record] p,[data-managed-profile],[data-saved-inquiries] p{overflow-wrap:anywhere}.panel{scroll-margin-top:1rem}.admin-tabs a{display:inline-flex;align-items:center;min-height:44px}.admin-tabs{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}.admin-tabs button{min-height:44px}.button-row{display:flex;flex-wrap:wrap;gap:.5rem}.care-plan button{margin:.25rem}.overview-list{display:grid;gap:.75rem}details{margin:.75rem 0}summary{cursor:pointer;min-height:44px;padding:.5rem}
  :root { --cloud: #f7fbfc; --white: #ffffff; --mist: #e7f0f4; --mist-2: #d7e6ec; --blue-gray: #6f8795; --slate: #294557; --deep: #172b36; --ink: #10232d; --lime: #a7d943; --lime-2: #d9fb79; --lime-dark: #5f7f17; --sand: #f6dfa7; --rose: #f8d7da; --card: rgba(255, 255, 255, 0.94); --shadow: 0 18px 48px rgba(23, 43, 54, 0.12); --shadow-soft: 0 10px 30px rgba(23, 43, 54, 0.08); --radius-xl: 34px; --radius-lg: 24px; --radius-md: 18px; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -1015,7 +1015,8 @@ input, select, textarea { min-width: 0; font-size: 16px; }
  ${roleSectionLinks(["Connected Demo Referrals & Schedule","Daily Operations & Appointment Decisions","Detailed Client Workspace","Assessment & Screening","Diagnosis & Treatment Planning"])}${panel("Connected Demo Referrals & Schedule", demoCounselorPanel())}${panel("Daily Operations & Appointment Decisions", dailyOperations())}${panel("Detailed Client Workspace", counselorWorkspace())}
  <div class="two-column">${panel("Assigned Clients", assigned.map(r => `<div class="care-plan"><strong>${escapeHtml(r.name)} · ${friendlyRecordLabel(r)}</strong><p>${r.status}</p><button class="lime-button" data-workspace-client="${r.id}">Open Workspace for ${escapeHtml(r.name)}</button></div>`).join("") || "<p>No assigned clients.</p>")}${panel("Schedule", assigned.filter(r => r.appointment || r.sampleAppointment).map(demoRequestSummary).join("") || "<p>No appointment records.</p>")}</div>`);
 }
- function adminDashboard() { return dashboardLayout("Admin CRM", "Fictional center operations. Historical samples and activity created during this page session are shown separately.", `<nav class="admin-tabs" aria-label="Admin work areas">${[['overview','Overview'],['appointments','Appointment Requests'],['pipeline','Care Journey'],['prayer','Prayer Requests'],['clients','Client Profiles'],['settings','Approval Settings'],['reports','Sample Reports']].map(([id,label])=>`<button data-admin-panel="${id}" aria-current="${state.activeAdminPanel===id?'page':'false'}" class="${state.activeAdminPanel===id?'active':''}">${label}</button>`).join('')}</nav>${state.notice?`<p role="status" class="workspace-status">${escapeHtml(state.notice)}</p>`:''}${adminPanel()}`); } function adminPanel() {
+ function adminDashboard() { return dashboardLayout("Admin CRM", "Fictional center operations. Historical samples and activity created during this page session are shown separately.", `<nav class="admin-tabs" aria-label="Admin work areas">${[['overview','Overview'],['prospective','Prospective Clients'],['established','Established Clients'],['appointments','Appointment Requests'],['pipeline','Care Journey'],['prayer','Prayer Requests'],['clients','Client Profiles'],['settings','Approval Settings'],['reports','Sample Reports']].map(([id,label])=>`<button data-admin-panel="${id}" aria-current="${state.activeAdminPanel===id?'page':'false'}" class="${state.activeAdminPanel===id?'active':''}">${label}</button>`).join('')}</nav>${state.notice?`<p role="status" class="workspace-status">${escapeHtml(state.notice)}</p>`:''}${adminPanel()}`); } function adminPanel() {
+ if(['prospective','established'].includes(state.activeAdminPanel)) return managedClientsPanel();
  if(state.activeAdminPanel==='appointments') return panel('Interactive Demo Onboarding',demoAdminPanel())+panel('Appointment Reschedule Requests',adminReschedulePanel())+panel('Appointment Cancellation Requests',adminCancellationPanel())+panel('Historical Referral Samples',appointmentManagement());
  if(state.activeAdminPanel==='prayer')return panel('Prayer Request Management',prayerManagement());
  if(state.activeAdminPanel==='clients')return panel('Client Profile Directory',clientDirectory());
@@ -1361,7 +1362,7 @@ async function saveCounselingInquiry(form) {
   // Keep the existing role walkthrough available; only the inquiry is persistent.
   const request = {id:`demo-${state.demoRequests.length + 1}`, inquiryId:saved.inquiry_id, demo:true, name:saved.fictional_client_name, concern:fields.get('concern'), preferredCare:fields.get('concern'), format:fields.get('format'), preferredCounselorId:counselor.id, counselorId:null, appointment:null, status:'New', source:'Fictional local inquiry', urgency:'Routine'};
   state.demoRequests.unshift(request); state.activeRequestId = request.id;
-  state.lastSavedInquiryId = saved.inquiry_id; state.savedInquiries = [saved, ...state.savedInquiries.filter(r => r.inquiry_id !== saved.inquiry_id)];
+  state.managementLoaded = false; state.lastSavedInquiryId = saved.inquiry_id; state.savedInquiries = [saved, ...state.savedInquiries.filter(r => r.inquiry_id !== saved.inquiry_id)];
   state.bookingSubmitted = true;
   state.notice = 'Fictional inquiry saved to SQLite. Review it in Admin CRM → Appointment Requests → Saved fictional inquiries. Only inquiry fields persist.';
  } catch (error) {state.inquirySaveError = 'Request was not confirmed saved. ' + error.message;}
@@ -1388,9 +1389,62 @@ async function loadSavedInquiries() {
  finally {state.inquiriesLoading = false; render();}
 }
 function bindSavedInquiryEvents() {
+ bindManagementEvents();
  document.querySelectorAll('[data-inquiry-refresh]').forEach(el => el.addEventListener('click', loadSavedInquiries));
  if (localInquiryBackend() && state.view === 'admin' && state.activeAdminPanel === 'appointments' && !state.inquiriesLoaded) loadSavedInquiries();
 }
+function managedClientsPanel() {
+ const established = state.activeAdminPanel === 'established';
+ const title = established ? 'Established Clients' : 'Prospective Clients';
+ if (!localInquiryBackend()) return panel(title, '<p>This persistent development workflow is available only at http://127.0.0.1:5500 with the local backend running. Use fictional data only.</p>');
+ const records = state.managedLists[established ? 'established' : 'prospective'];
+ const profile = state.managedProfile;
+ const profileMatches = profile && Boolean(profile.converted_at) === established;
+ return panel(title, `<p>Fictional local development records only. No authentication or HIPAA compliance. ELCCC conversion and MYIO invitation tracking are independent. No live Valant, Calendly, or MYIO connection.</p><button class="secondary-button" data-management-refresh ${state.managementLoading || state.managementSaving ? 'disabled' : ''}>Refresh client lists</button><p role="status">${escapeHtml(state.managementError || state.managementNotice || (state.managementLoading ? 'Loading client lists…' : `${records.length} ${established ? 'established' : 'prospective'} fictional clients.`))}</p>${state.managementError && records.length ? '<p>Previously loaded records may be stale.</p>' : ''}${records.map(r => `<article class="care-plan" data-managed-record><h3>${escapeHtml(r.fictional_client_name)}</h3><p>Inquiry ID: ${escapeHtml(r.inquiry_id)}</p><p>Created: ${escapeHtml(r.created_at)} · MYIO tracking: ${escapeHtml(r.portal_status)}</p><button class="secondary-button" data-management-open="${escapeHtml(r.inquiry_id)}" ${state.managementSaving || state.managementLoading ? 'disabled' : ''}>Open fictional profile</button></article>`).join('')}${state.managementLoaded && !state.managementLoading && !state.managementError && !records.length ? '<p>No ' + (established ? 'established' : 'prospective') + ' fictional clients yet.</p>' : ''}${profileMatches ? `<section class="panel" data-managed-profile><h2>${escapeHtml(profile.fictional_client_name)} — fictional profile</h2><p>Original inquiry ID: ${escapeHtml(profile.inquiry_id)}</p><p>Inquiry created: ${escapeHtml(profile.created_at)}</p><p>Counseling category: ${escapeHtml(profile.category)} · Preferred contact method: ${escapeHtml(profile.preferred_contact_method)} · Original inquiry status: ${escapeHtml(profile.status)}</p><p>${profile.converted_at ? 'Converted: ' + escapeHtml(profile.converted_at) : 'Not converted to client.'}</p><p>Only the inquiry information above is available. No clinical intake, contact details, or diagnoses are stored.</p><form data-portal-status="${escapeHtml(profile.inquiry_id)}"><label>MYIO invitation tracking (simulated)<select name="portal_status">${['Not Sent','Sent','Activated'].map(status => `<option ${status === profile.portal_status ? 'selected' : ''}>${status}</option>`).join('')}</select></label><p>Tracking only. Saving “Sent” sends no invitation; “Activated” does not verify a MYIO account.</p><button class="secondary-button" type="submit" ${state.managementSaving || state.managementLoading ? 'disabled' : ''}>Save invitation tracking</button></form>${!profile.converted_at ? (state.confirmConversion === profile.inquiry_id ? `<div class="care-plan" role="group" aria-label="Confirm client conversion"><p>Convert ${escapeHtml(profile.fictional_client_name)} to an established fictional client? The original inquiry and history will remain saved. This does not create an external account or invite anyone.</p><button class="lime-button" data-management-confirm="${escapeHtml(profile.inquiry_id)}" ${state.managementSaving || state.managementLoading ? 'disabled' : ''}>Confirm Conversion</button><button class="secondary-button" data-management-cancel ${state.managementSaving || state.managementLoading ? 'disabled' : ''}>Cancel Conversion</button></div>` : `<button class="lime-button" data-management-convert="${escapeHtml(profile.inquiry_id)}" ${state.managementSaving || state.managementLoading ? 'disabled' : ''}>Convert to Client</button>`) : ''}<h3>Conversion and invitation history</h3><ol>${profile.history.map(event => `<li>${escapeHtml(event.occurred_at)} · ${escapeHtml(event.action)} — ${escapeHtml(event.detail)}</li>`).join('')}</ol><button class="secondary-button" data-management-close ${state.managementSaving || state.managementLoading ? 'disabled' : ''}>Close profile</button></section>` : ''}`);
+}
+async function loadManagedClients() {
+ if (!localInquiryBackend() || state.managementLoading || state.managementSaving) return;
+ state.managementLoading = true; state.managementError = ''; state.managementNotice = ''; render();
+ try {
+  const [prospective, established] = await Promise.all([inquiryApi('/api/prospective-clients'), inquiryApi('/api/clients')]);
+  state.managedLists = {prospective, established}; state.managementLoaded = true;
+  if (state.managedProfile) state.managedProfile = [...prospective, ...established].find(r => r.inquiry_id === state.managedProfile.inquiry_id) || null;
+ } catch (error) {state.managementError = 'Could not load client lists. ' + error.message; state.managementLoaded = true;}
+ finally {state.managementLoading = false; render();}
+}
+async function openManagedProfile(id) {
+ if (state.managementSaving || state.managementLoading) return;
+ state.managementSaving = true; state.managementError = ''; state.managementNotice = 'Loading fictional profile…'; state.managedProfile = null; state.confirmConversion = null; render();
+ try {state.managedProfile = await inquiryApi('/api/inquiries/' + encodeURIComponent(id) + '/management'); state.managementNotice = '';}
+ catch (error) {state.managementError = 'Could not open profile. ' + error.message; state.managementNotice = '';}
+ finally {state.managementSaving = false; render();}
+}
+async function updateManagedProfile(id, action, payload) {
+ if (state.managementSaving || state.managementLoading || state.demoRole !== 'Admin' || !localInquiryBackend()) return;
+ state.managementSaving = true; state.managementError = ''; state.managementNotice = 'Saving local record…'; render();
+ try {
+  const record = await inquiryApi('/api/inquiries/' + encodeURIComponent(id) + '/' + action, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  state.managedProfile = record; state.confirmConversion = null;
+  for (const key of ['prospective','established']) state.managedLists[key] = state.managedLists[key].filter(r => r.inquiry_id !== id);
+  state.managedLists[record.converted_at ? 'established' : 'prospective'].unshift(record);
+  if (action === 'convert') state.activeAdminPanel = 'established';
+  state.managementNotice = action === 'convert' ? 'Conversion saved. This record is now an established fictional client.' : 'Invitation tracking saved locally. No invitation was sent and no MYIO account was verified.';
+ } catch (error) {state.managementError = 'Change was not confirmed saved. Refresh the lists before retrying. ' + error.message; state.managementNotice = '';}
+ finally {state.managementSaving = false; render();}
+}
+function bindManagementEvents() {
+ if (!localInquiryBackend() || state.view !== 'admin' || state.demoRole !== 'Admin') return;
+ document.querySelectorAll('[data-management-refresh]').forEach(el => el.addEventListener('click', () => {state.managementNotice = ''; loadManagedClients();}));
+ document.querySelectorAll('[data-management-open]').forEach(el => el.addEventListener('click', () => openManagedProfile(el.dataset.managementOpen)));
+ document.querySelectorAll('[data-management-close]').forEach(el => el.addEventListener('click', () => {state.managedProfile = null; state.confirmConversion = null; render();}));
+ document.querySelectorAll('[data-management-convert]').forEach(el => el.addEventListener('click', () => {state.confirmConversion = el.dataset.managementConvert; render();}));
+ document.querySelectorAll('[data-management-cancel]').forEach(el => el.addEventListener('click', () => {state.confirmConversion = null; render();}));
+ document.querySelectorAll('[data-management-confirm]').forEach(el => el.addEventListener('click', () => {if (state.confirmConversion === el.dataset.managementConfirm) updateManagedProfile(el.dataset.managementConfirm, 'convert', {confirmed:true});}));
+ document.querySelectorAll('[data-portal-status]').forEach(form => form.addEventListener('submit', event => {event.preventDefault(); updateManagedProfile(form.dataset.portalStatus, 'portal-status', {portal_status:new FormData(form).get('portal_status')});}));
+ if (['prospective','established'].includes(state.activeAdminPanel) && !state.managementLoaded && !state.managementLoading) loadManagedClients();
+}
+Object.assign(state, {managedLists:{prospective:[], established:[]}, managedProfile:null, managementLoaded:false, managementLoading:false, managementSaving:false, managementError:'', managementNotice:'', confirmConversion:null});
+
 Object.assign(state, {savedInquiries:[], inquiriesLoaded:false, inquiriesLoading:false, inquiriesError:'', inquirySaving:false, inquirySaveError:'', lastSavedInquiryId:''});
 
 let dialogReturnFocus = null;

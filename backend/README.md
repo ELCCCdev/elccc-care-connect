@@ -134,7 +134,7 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 ```
 
-Eight tests use disposable databases: demo/health responses, create/list/retrieve
+The Phase 2 tests use disposable databases: demo/health responses, create/list/retrieve
 and metadata, restart persistence without duplicate samples, validation/malformed
 JSON, missing/invalid IDs, SQL-like input and whitespace, database errors, and allowed/disallowed local CORS origins. Tests do not change your demo database.
 
@@ -162,3 +162,16 @@ JSON, missing/invalid IDs, SQL-like input and whitespace, database errors, and a
 The Phase 2 frontend integration is documented in the root README. The GitHub
 Pages deployment configuration remains unchanged, and the static build does not
 publish this backend or its data. Public Pages retains the static mock behavior.
+
+
+## Phase 3 management
+
+See the root README's Phase 3 section for Mac setup and the Admin workflow.
+Startup adds `inquiry_management` and `inquiry_history` tables in the existing
+SQLite database without changing original inquiries. The original inquiry APIs
+remain unchanged. New management APIs list prospective/established clients,
+retrieve profiles, confirm conversions, and update MYIO demonstration tracking.
+Conversion and invitation statuses are independent and persist across restarts.
+No invitations are sent or external accounts checked. The new tests cover
+conversion, duplicate/competing requests, history, independent invitation tracking,
+legacy database preservation, and restart persistence. All data is fictional.

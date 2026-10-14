@@ -361,3 +361,115 @@ The script starts local frontend/backend servers with a disposable SQLite file
 and shuts them down afterward. It checks exact payload mapping, CORS, Admin
 retrieval, refresh/restart persistence, backend/network error handling, and static
 origin isolation. It does not touch your demonstration database.
+
+
+## Phase 3: prospective clients, conversion, and invitation tracking
+
+Phase 3 adds **Prospective Clients** and **Established Clients** to Admin CRM.
+It builds on Phase 2 and uses the same SQLite file. Original inquiry IDs, UTC
+creation timestamps, and original inquiry statuses remain unchanged. Backend
+startup creates additive management/history tables automatically; do not delete
+your existing database. Existing fictional inquiries start as prospective clients
+with MYIO tracking **Not Sent**.
+
+### Exact Mac setup commands
+
+Stop the previous backend with Control+C. In Terminal 1, from your existing
+`elccc-care-connect` repository root:
+
+```bash
+git fetch origin
+git switch codex/elccc-backend-phase-3
+git pull --ff-only origin codex/elccc-backend-phase-3
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Python 3.9+ is supported. If Git reports uncommitted local edits, preserve them
+before switching; do not discard them. Keep this terminal running.
+
+In Terminal 2, from the repository root:
+
+```bash
+python3 -m http.server 5500 --bind 127.0.0.1
+```
+
+If Live Server is already running on port 5500, use that server instead. Open
+**http://127.0.0.1:5500** in Chrome. Use localhost port 5500 only; the public
+GitHub Pages version does not call this local backend.
+
+### Walkthrough
+
+1. Submit a preset fictional Request Counseling as in Phase 2, or use the three
+   fictional sample inquiries already in the database.
+2. Choose **I'm an Administrator** (or Switch Demo Role → Administrator), then
+   **Prospective Clients**. Open a fictional profile to review the stored inquiry
+   ID, category, contact preference, creation date, and available history. No
+   clinical intake fields or real contact details have been added.
+3. Choose **Sent** in **MYIO invitation tracking (simulated)** and click **Save
+   invitation tracking** while the record is still prospective. The change is
+   saved locally and appears in history. No invitation is sent.
+4. Click **Convert to Client**. Choose **Cancel Conversion** to leave it unchanged,
+   or **Confirm Conversion** to save the conversion. Only confirmed conversions
+   persist. The page switches to Established Clients, where the same inquiry ID
+   and creation date are retained. It no longer appears in active Prospective Clients.
+5. Open the established profile and change invitation tracking to **Activated**.
+   This is a manual demonstration status; no MYIO account is verified. Invitation
+   tracking can also be changed back to **Not Sent**, independently of conversion.
+6. Refresh Chrome, choose Administrator again, and reopen Established Clients.
+   Conversion, invitation status, and history remain saved. Stop/restart the backend
+   using the same command and database; **Refresh client lists** shows the same record.
+
+The new lists include loading, empty, and error feedback. Refresh updates both
+lists and the open profile. Failed writes never display a successful conversion.
+After an ambiguous timeout, refresh before retrying. Concurrent/duplicate
+conversions return 409 and never create another conversion event or client.
+
+### API and storage
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/api/prospective-clients` | Inquiries without a conversion |
+| GET | `/api/clients` | Established fictional clients |
+| GET | `/api/inquiries/{inquiry_id}/management` | Stored profile and available history |
+| POST | `/api/inquiries/{inquiry_id}/convert` | Confirmed conversion: `{"confirmed": true}` |
+| POST | `/api/inquiries/{inquiry_id}/portal-status` | Tracking update: `{"portal_status": "Sent"}` |
+
+Invitation statuses are exactly `Not Sent`, `Sent`, and `Activated`. Duplicate
+unchanged status updates do not add duplicate history events. Conversion uses a
+SQLite transaction and the unique original inquiry ID. No duplicate client row
+is created. The original inquiry endpoints and Phase 2 request schema are unchanged;
+`GET /api/inquiries` still includes all original inquiries, even converted ones.
+History includes the original inquiry's creation and subsequent management changes;
+there is no invented historical intake or staff identity.
+
+The ELCCC conversion lifecycle and portal tracking are separate from provider
+integrations. A future authorized integration can build on this API without
+making conversion depend on MYIO. No Valant, Calendly, MYIO, email, or invitation
+service is called. No credentials are collected.
+
+### Verification and limits
+
+From `backend/`, with the virtual environment active:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -v
+```
+
+The suite includes Phase 2 tests plus conversion, confirmation, competing/duplicate
+conversions, legacy SQLite preservation, history, independent invitation updates,
+and restart persistence. The optional browser command documented in Phase 2,
+`python scripts/check-backend-integration.py`, now also exercises Phase 3 navigation,
+confirmation/cancellation, profile review, invitation tracking, error states,
+and persistence after page refresh and an actual backend process restart.
+
+All information must be fictional. There is no authentication, authorization,
+HIPAA compliance, external portal activation, or real staff audit attribution.
+Conversion is one-way in this prototype. Assignment, appointments, care activities,
+and historical Client Profiles remain unrelated session simulations; conversion
+moves records between the new persistent sections, not into those mock profiles.
+No deployment or merge is performed by these setup commands.
