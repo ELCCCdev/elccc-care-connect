@@ -1,18 +1,20 @@
 """Local-only fictional inquiries demo. Never store real patient information."""
 from contextlib import closing, asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import logging
 import os
+import re
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import sqlite3
 from typing import Literal, Optional
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 Category = Literal['individual', 'couples', 'family', 'general']
@@ -58,10 +60,46 @@ class HistoryEvent(BaseModel):
     detail: str
 
 
+class PreferenceDetails(BaseModel):
+    email: str = Field(max_length=254)
+    phone: str = Field(max_length=32)
+    session_format: Literal['Telehealth', 'In-person', 'No preference']
+    preferred_counselor_id: Optional[str] = None
+    preferred_date: date
+    preferred_time: Literal['Morning', 'Afternoon', 'Evening', 'No preference']
+    time_zone: Literal['America/New_York'] = 'America/New_York'
+
+
+class PreferenceRequest(InquiryCreate, PreferenceDetails):
+    request_key: UUID
+
+    @model_validator(mode='after')
+    def validate_synthetic_request(self):
+        if not self.fictional_client_name.startswith('Test ') or len(self.fictional_client_name.split()) < 3:
+            raise ValueError('Development preview: use a synthetic full name such as Test Alex River.')
+        if not re.fullmatch(r'[A-Za-z0-9._+-]+@example\.(com|org|net)', self.email):
+            raise ValueError('Development preview: use an example.com, example.org, or example.net email.')
+        digits = re.sub(r'[^0-9]', '', self.phone)
+        if len(digits) == 11 and digits.startswith('1'):
+            digits = digits[1:]
+        if not re.fullmatch(r'[2-9][0-9]{2}55501[0-9]{2}', digits):
+            raise ValueError('Development preview: use a reserved test phone such as 202-555-0100.')
+        self.phone = digits
+        if self.preferred_date < datetime.now(timezone.utc).astimezone(ZoneInfo('America/New_York')).date():
+            raise ValueError('Choose today or a future preference date.')
+        allowed = {None, 'denice-colson', 'staci-stephens', 'melissa-smith', 'jonathan-reeves',
+                   'rachel-kim', 'amy-parker', 'brian-holloway', 'sarah-williams',
+                   'maria-gonzalez', 'kevin-brooks', 'lauren-bennett', 'thomas-green'}
+        if self.preferred_counselor_id not in allowed:
+            raise ValueError('Choose a listed counselor or no preference.')
+        return self
+
+
 class ManagedInquiry(Inquiry):
     converted_at: Optional[datetime] = None
     portal_status: PortalStatus = 'Not Sent'
     history: list[HistoryEvent]
+    preferences: Optional[PreferenceDetails] = None
 
 def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
     """Factory allows tests to use disposable SQLite files."""
@@ -110,6 +148,10 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
                 event_id INTEGER PRIMARY KEY,
                 inquiry_id TEXT NOT NULL REFERENCES inquiries(inquiry_id),
                 action TEXT NOT NULL, occurred_at TEXT NOT NULL, detail TEXT NOT NULL
+            )""")
+            connection.execute("""CREATE TABLE IF NOT EXISTS preference_requests (
+                inquiry_id TEXT PRIMARY KEY REFERENCES inquiries(inquiry_id),
+                request_key TEXT NOT NULL UNIQUE, payload TEXT NOT NULL
             )""")
             # Seed once per database, even when an existing database is later emptied.
             connection.execute('CREATE TABLE IF NOT EXISTS demo_metadata (key TEXT PRIMARY KEY)')
@@ -189,6 +231,23 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
             raise HTTPException(status_code=404, detail='Inquiry not found. Check the inquiry ID.')
         return dict(record)
 
+    @app.post('/api/preference-requests', response_model=Inquiry, status_code=201)
+    def create_preference_request(payload: PreferenceRequest, response: Response):
+        serialized = payload.model_dump_json(exclude={'request_key'})
+        with closing(connect()) as connection, connection:
+            connection.execute('BEGIN IMMEDIATE')
+            existing = connection.execute('SELECT * FROM preference_requests WHERE request_key = ?',
+                                          (str(payload.request_key),)).fetchone()
+            if existing:
+                if existing['payload'] != serialized:
+                    raise HTTPException(status_code=409, detail='This request reference was already used. Review the original submission before retrying.')
+                response.status_code = 200
+                return dict(connection.execute('SELECT * FROM inquiries WHERE inquiry_id = ?', (existing['inquiry_id'],)).fetchone())
+            record = insert(connection, payload.fictional_client_name, payload.category, payload.preferred_contact_method)
+            connection.execute('INSERT INTO preference_requests VALUES (?, ?, ?)',
+                               (record['inquiry_id'], str(payload.request_key), serialized))
+            return record
+
     def managed_record(connection, inquiry_id):
         row = connection.execute(
             """SELECT i.*, m.converted_at, COALESCE(m.portal_status, 'Not Sent') AS portal_status
@@ -198,6 +257,9 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
         if row is None:
             raise HTTPException(status_code=404, detail='Inquiry not found. Check the inquiry ID.')
         record = dict(row)
+        details = connection.execute('SELECT payload FROM preference_requests WHERE inquiry_id = ?', (str(inquiry_id),)).fetchone()
+        if details:
+            record['preferences'] = PreferenceDetails.model_validate_json(details['payload']).model_dump()
         record['history'] = [dict(action='Inquiry created', occurred_at=record['created_at'],
                                   detail='Original fictional inquiry received.')] + [
             dict(event) for event in connection.execute(

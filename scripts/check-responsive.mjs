@@ -8,7 +8,7 @@ const browser = await chromium.launch({executablePath:process.env.CHROMIUM_PATH 
 const page = await browser.newPage();
 const errors=[];
 page.on('pageerror', e=>errors.push(e.message));
-const url=process.env.PROTOTYPE_URL || 'http://127.0.0.1:4173/';
+const url=process.env.PROTOTYPE_URL || 'http://127.0.0.1:4173/?tools=1';
 async function noOverflow(label) {
  const problems = await page.evaluate(()=>{
   const width=document.documentElement.clientWidth;

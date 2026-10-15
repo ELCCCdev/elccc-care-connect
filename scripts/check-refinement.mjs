@@ -13,7 +13,8 @@ assert.equal((nav.match(/<button/g)||[]).length,6); // Five primary areas, one O
 for(const label of ['Overview','Clients','Appointments','Care Journey','Reports'])assert.ok(nav.includes('>'+label+'</button>'));
 assert.doesNotMatch(nav,/Approval Settings|data-admin-panel="settings"/);
 run("state.activeAdminPanel='prospective'");nav=run('adminNavigation()');
-for(const label of ['Prospective Clients','Established Clients','Reference Profiles'])assert.ok(nav.includes('>'+label+'</button>'));
+for(const label of ['Prospective Clients','Established Clients'])assert.ok(nav.includes('>'+label+'</button>'));
+assert.doesNotMatch(nav,/Reference Profiles/);
 assert.equal(run('adminGroup()'),'clients');
 run("state.activeAdminPanel='established'");assert.equal(run('adminGroup()'),'clients');
 run("state.activeAdminPanel='settings'");assert.doesNotMatch(run('adminPanel()'),/data-approval-mode|Center approval routing/);

@@ -707,3 +707,21 @@ schema, authentication, live scheduling, messaging or integration is added.
 Run the existing backend/frontend suites plus `node scripts/check-onboarding.mjs`.
 Browser checks use the updated visible labels while retaining their behavioral
 assertions for search, sorting, filters, intake, conversion, tracking and persistence.
+
+## Guided public counseling request
+
+The public **Request Counseling** button now opens contact → counseling preferences
+→ optional counselor → preferred date/time → review → saved-reference confirmation.
+There is no existing-client dropdown. This is an appointment-preference request,
+not live scheduling. Only synthetic test contact details are accepted; no real
+personal or clinical information is permitted.
+
+Use branch `codex/elccc-public-preference-request`. See the
+[local Mac walkthrough and capability/implementation plan](docs/PUBLIC_REQUEST_FLOW.md)
+for exact setup commands, test values, CRM conversion/persistence checks, automated
+checks, and security prerequisites. Saved contact/preferences remain under the
+original inquiry UUID when converted. Existing backend routes remain compatible.
+
+Normal pages omit historical archive navigation and development planning panels.
+The retained historical/testing workspace is explicitly available at `?tools=1`.
+No authentication, real booking, paperwork delivery or external integration is added.

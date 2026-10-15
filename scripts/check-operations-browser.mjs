@@ -6,7 +6,7 @@ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH ||
 const page=await browser.newPage({viewport:{width:375,height:812}});
 const errors=[],external=[];
 page.on('pageerror',e=>errors.push(e.message));
-const url=process.env.PROTOTYPE_URL || 'http://127.0.0.1:4173/';
+const url=process.env.PROTOTYPE_URL || 'http://127.0.0.1:4173/?tools=1';
 page.on('request',r=>{if(!r.url().startsWith(new URL(url).origin))external.push(r.url());});
 const role=name=>page.getByRole('button',{name,exact:true});
 async function primary(view) {const button=page.locator(`#primary-navigation [data-view="${view}"]`);if(!await button.isVisible())await role('Menu').click();await button.click();}

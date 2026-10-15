@@ -2,7 +2,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 const root={innerHTML:''};const document={getElementById:()=>root,querySelectorAll:()=>[],querySelector:()=>null};
-const context=vm.createContext({document,window:{scrollTo(){}},console});
+const context=vm.createContext({document,window:{scrollTo(){},location:{search:'?tools=1'}},console});
 vm.runInContext(readFileSync('index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1],context);
 const run=code=>vm.runInContext(code,context);const ids=()=>Array.from(run('filteredManagedRecords().map(r=>r.inquiry_id)'));
 run(`state.activeAdminPanel='prospective';state.managedLists={prospective:[{inquiry_id:'ref-b',fictional_client_name:'Zoe Demo',category:'family',portal_status:'Sent',created_at:'2026-01-01T00:00:00Z',converted_at:null,history:[{occurred_at:'2026-04-01T00:00:00Z'}]},{inquiry_id:'ref-a',fictional_client_name:'Avery Demo',category:'individual',portal_status:'Not Sent',created_at:'2026-02-01T00:00:00Z',converted_at:null,history:[{action:'Inquiry created',occurred_at:'2026-02-01T00:00:00Z'}]}],established:[{inquiry_id:'ref-c',fictional_client_name:'Morgan Demo',category:'couples',portal_status:'Activated',created_at:'2025-01-01T00:00:00Z',converted_at:'2026-03-01T00:00:00Z',history:[{occurred_at:'2026-03-01T00:00:00Z'}]}]};`);

@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory() as temp:
                     if request.method == 'POST' and '/api/inquiries' in request.url else None)
 
             def open_form():
-                page.evaluate("state.bookingCounselor=counselors.find(c=>c.id==='rachel-kim');state.bookingSubmitted=false;state.inquirySaveError='';render()")
+                page.evaluate("state.view='client';state.demoRole='Client';state.bookingCounselor=counselors.find(c=>c.id==='rachel-kim');state.bookingSubmitted=false;state.inquirySaveError='';render()")
 
             def open_admin():
                 page.evaluate("state.bookingCounselor=null;selectDemoRole('Admin');state.activeAdminPanel='appointments';render()")
@@ -225,7 +225,7 @@ with tempfile.TemporaryDirectory() as temp:
             other = browser.new_page()
             requests = []
             other.on('request', lambda request: requests.append(request.url))
-            other.goto('http://127.0.0.1:5501')
+            other.goto('http://127.0.0.1:5501/?tools=1')
             other.evaluate("state.bookingCounselor=counselors[0];render()")
             other.get_by_role('button', name='Submit Request', exact=True).click()
             assert other.evaluate('state.demoRequests.length') == 1

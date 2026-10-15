@@ -175,3 +175,21 @@ Conversion and invitation statuses are independent and persist across restarts.
 No invitations are sent or external accounts checked. The new tests cover
 conversion, duplicate/competing requests, history, independent invitation tracking,
 legacy database preservation, and restart persistence. All data is fictional.
+
+### Synthetic appointment-preference requests
+
+`POST /api/preference-requests` adds a guided contact/preference submission while
+preserving the original inquiry API. It accepts the original required inquiry fields
+plus `email`, `phone`, `session_format` (Telehealth/In-person/No preference), optional
+`preferred_counselor_id`, `preferred_date` (today or later), `preferred_time`
+(Morning/Afternoon/Evening/No preference), `time_zone` (America/New_York), and a UUID
+`request_key`. Unknown fields are rejected. Synthetic-only name/email/phone rules
+are enforced server-side; see the [walkthrough](../docs/PUBLIC_REQUEST_FLOW.md).
+
+A new additive `preference_requests` table links details to the existing inquiry
+UUID. Management responses expose optional `preferences`; older inquiries have none.
+An identical retry with the same request key returns HTTP 200 and the original ID;
+a different payload with that key returns 409. A new submission returns 201. Name
+is never an identity key. Conversion retains these details and existing history.
+No appointment, invitation, intake document, or message is created or sent.
+Python 3.9+ and existing dependencies remain supported; no new dependency is needed.

@@ -6,7 +6,7 @@ const root = {innerHTML:''};
 let elements = {};
 const document = {getElementById:()=>root, querySelectorAll:s=>elements[s] || [], querySelector:()=>null};
 class DemoFormData { constructor(form) {this.fields=form.fields;} get(key) {return this.fields[key];} }
-const context = vm.createContext({document, window:{scrollTo(){}}, FormData:DemoFormData, console});
+const context = vm.createContext({document, window:{location:{search:'?tools=1'},scrollTo(){}}, FormData:DemoFormData, console});
 vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
 const run = code=>vm.runInContext(code,context);
 function event(selector, dataset, fields, type='click') {
