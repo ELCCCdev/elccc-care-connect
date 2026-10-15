@@ -602,8 +602,9 @@ Directory assignment and intake details come from an explicitly linked session
 referral (`inquiryId`), never from a name match. They are labeled as session-only
 and reset on refresh. Where no assignment/intake exists, the profile says Not
 assigned/Not collected. These fields are not fabricated or written to SQLite.
-Last activity uses stored creation/management history plus any linked session
-notifications; permanent history and session progress remain distinct.
+Last activity uses valid timestamps in recorded management history plus explicitly
+linked session notifications; inquiry/appointment dates are not inferred as activity.
+Records with no valid events show **No activity recorded**; permanent history and session progress remain distinct.
 
 Search, sorting, and filtering run over the loaded fictional dataset in the browser.
 They are functional, but not server-side pagination/search or access controls.
@@ -641,3 +642,27 @@ The browser integration check now tests client search, sorting, combined filters
 status navigation, conversion, and tracking. The operations browser check tests
 appointment search/filters, calendar selection, review, and existing care workflows.
 All browser fixtures use fictional data and disposable databases.
+
+
+## Sortable directory columns
+
+Branch `codex/elccc-sortable-column-headers` adds clickable **Name**, **Status**,
+and **Last Activity** headers to the client directory. The appointment list has
+**Name**, **Date**, and **Status** headers. An arrow shows the current direction;
+click the active header again to reverse it. Choosing another header or using the
+sort dropdown updates the same sort state without clearing search or filters.
+Last Activity starts newest-first when selected from another column. Missing
+activity stays last in either direction.
+
+Last Activity uses only valid event timestamps from stored inquiry/management
+history and explicitly linked session notifications. Backend history includes the
+recorded inquiry creation event. No appointment date or inferred creation fallback
+is used, and no activity dates are generated. Unknown activity displays **No activity
+recorded**. Appointment Date remains a separate scheduling column.
+
+Use the existing local setup after `git fetch origin` and
+`git switch codex/elccc-sortable-column-headers`; hard refresh Chrome. Try a column
+header twice, then change the dropdown and verify its arrow updates. Search and
+filter results should remain scoped. Sort buttons support keyboard activation and
+expose their direction through `aria-sort`. Backend, database, scheduling, and
+integration behavior are unchanged.

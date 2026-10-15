@@ -115,6 +115,24 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_label('Sort clients', exact=True).select_option('za')
             names = page.locator('[data-managed-record] h3').all_text_contents()
             assert names == sorted(names, reverse=True)
+            page.get_by_label('Sort clients', exact=True).select_option('newest')
+            page.get_by_role('button', name='Name', exact=True).click()
+            assert page.get_by_label('Sort clients', exact=True).input_value() == 'az'
+            page.get_by_role('button', name='Name', exact=True).click()
+            assert page.get_by_label('Sort clients', exact=True).input_value() == 'za'
+            assert page.get_by_role('columnheader', name='Name', exact=True).get_attribute('aria-sort') == 'descending'
+            page.get_by_role('button', name='Last Activity', exact=True).click()
+            assert page.get_by_label('Sort clients', exact=True).input_value() == 'recent'
+            records = json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/prospective-clients'))
+            expected = sorted(records, key=lambda r: max(e['occurred_at'] for e in r['history']), reverse=True)
+            actual = page.locator('[data-management-open]').evaluate_all('els => els.map(el => el.dataset.managementOpen)')
+            assert actual == [r['inquiry_id'] for r in expected]
+            activity_header = page.get_by_role('button', name='Last Activity', exact=True)
+            activity_header.focus()
+            activity_header.press('Enter')
+            assert page.get_by_label('Sort clients', exact=True).input_value() == 'oldest'
+            assert page.get_by_role('columnheader', name='Last Activity', exact=True).get_attribute('aria-sort') == 'ascending'
+
             page.get_by_label('Inquiry category', exact=True).select_option('couples')
             assert page.locator('[data-managed-record]').count() == 1
             page.get_by_label('Onboarding status', exact=True).select_option('Sent')

@@ -20,6 +20,13 @@ try {
  await page.getByLabel('Filter by date',{exact:true}).fill('2099-01-01');
  await page.getByLabel('Filter by date',{exact:true}).press('Tab');
  assert.equal(await page.locator('[data-appointment-row]').count(),1);
+ await page.getByRole('button',{name:'Name',exact:true}).click();assert.equal(await page.getByLabel('Sort appointments',{exact:true}).inputValue(),'name');
+ await page.getByRole('button',{name:'Name',exact:true}).click();assert.equal(await page.getByLabel('Sort appointments',{exact:true}).inputValue(),'namedesc');
+ await page.getByRole('button',{name:'Date',exact:true}).click();assert.equal(await page.getByLabel('Sort appointments',{exact:true}).inputValue(),'soonest');
+ await page.getByRole('button',{name:'Date',exact:true}).click();assert.equal(await page.getByLabel('Sort appointments',{exact:true}).inputValue(),'latest');
+ assert.equal(await page.getByLabel('Search appointments',{exact:true}).inputValue(),'Jordan');
+ assert.equal(await page.getByLabel('Appointment counselor',{exact:true}).inputValue(),'rachel-kim');
+
  await page.getByLabel('Appointment status',{exact:true}).selectOption('Cancelled');
  assert.equal(await page.locator('[data-appointment-row]').count(),0);
  await page.getByLabel('Appointment status',{exact:true}).selectOption('Confirmed');

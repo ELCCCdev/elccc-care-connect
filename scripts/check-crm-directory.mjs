@@ -5,7 +5,7 @@ const root={innerHTML:''};const document={getElementById:()=>root,querySelectorA
 const context=vm.createContext({document,window:{scrollTo(){}},console});
 vm.runInContext(readFileSync('index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1],context);
 const run=code=>vm.runInContext(code,context);const ids=()=>Array.from(run('filteredManagedRecords().map(r=>r.inquiry_id)'));
-run(`state.activeAdminPanel='prospective';state.managedLists={prospective:[{inquiry_id:'ref-b',fictional_client_name:'Zoe Demo',category:'family',portal_status:'Sent',created_at:'2026-01-01T00:00:00Z',converted_at:null,history:[{occurred_at:'2026-04-01T00:00:00Z'}]},{inquiry_id:'ref-a',fictional_client_name:'Avery Demo',category:'individual',portal_status:'Not Sent',created_at:'2026-02-01T00:00:00Z',converted_at:null,history:[]}],established:[{inquiry_id:'ref-c',fictional_client_name:'Morgan Demo',category:'couples',portal_status:'Activated',created_at:'2025-01-01T00:00:00Z',converted_at:'2026-03-01T00:00:00Z',history:[{occurred_at:'2026-03-01T00:00:00Z'}]}]};`);
+run(`state.activeAdminPanel='prospective';state.managedLists={prospective:[{inquiry_id:'ref-b',fictional_client_name:'Zoe Demo',category:'family',portal_status:'Sent',created_at:'2026-01-01T00:00:00Z',converted_at:null,history:[{occurred_at:'2026-04-01T00:00:00Z'}]},{inquiry_id:'ref-a',fictional_client_name:'Avery Demo',category:'individual',portal_status:'Not Sent',created_at:'2026-02-01T00:00:00Z',converted_at:null,history:[{action:'Inquiry created',occurred_at:'2026-02-01T00:00:00Z'}]}],established:[{inquiry_id:'ref-c',fictional_client_name:'Morgan Demo',category:'couples',portal_status:'Activated',created_at:'2025-01-01T00:00:00Z',converted_at:'2026-03-01T00:00:00Z',history:[{occurred_at:'2026-03-01T00:00:00Z'}]}]};`);
 assert.deepEqual(ids(),['ref-a','ref-b']);
 for(const [sort,expected] of [['za',['ref-b','ref-a']],['recent',['ref-b','ref-a']],['oldest',['ref-a','ref-b']],['newest',['ref-a','ref-b']]]){run(`state.directoryFilters.sort='${sort}'`);assert.deepEqual(ids(),expected);}
 run("state.directoryFilters.search='REF-B'");assert.deepEqual(ids(),['ref-b']);
@@ -28,4 +28,12 @@ assert.deepEqual(Array.from(run('filteredAppointments().map(r=>r.name)')),['Ada 
 run("state.appointmentFilters.sort='latest'");assert.deepEqual(Array.from(run('filteredAppointments().map(r=>r.name)')),['Zoe Demo','Ada Demo','Ben Demo']);
 run("state.appointmentFilters.sort='name'");assert.deepEqual(Array.from(run('filteredAppointments().map(r=>r.name)')),['Ada Demo','Ben Demo','Zoe Demo']);
 run("state.appointmentFilters.view='calendar';state.appointmentFilters.month='2098-01'");assert.equal(run('filteredAppointments().length'),1);
-console.log('PASS: directory name/reference search, six sort choices, combined lifecycle/category/invitation/counselor filters, ID-only links, appointment filters and leap-year calendar.');
+// Activity must come from real recorded events, never an appointment or inferred date.
+run("state.directoryFilters=defaultDirectoryFilters();state.managedLists.prospective.push({inquiry_id:'ref-none',fictional_client_name:'No Activity Demo',category:'general',portal_status:'Not Sent',created_at:'2099-01-01T00:00:00Z',history:[{occurred_at:'invalid'}]})");
+assert.equal(run("recordActivity(state.managedLists.prospective.find(r=>r.inquiry_id==='ref-none'))"),null);
+for(const sort of ['recent','oldest']){run(`state.directoryFilters.sort='${sort}'`);assert.equal(ids().at(-1),'ref-none');}
+assert.equal(run("recordActivity(state.managedLists.prospective.find(r=>r.inquiry_id==='ref-b'))"),Date.parse('2026-04-01T00:00:00Z')); // Appointment is in 2099.
+assert.match(run("managedDirectoryRows([state.managedLists.prospective.find(r=>r.inquiry_id==='ref-none')],'')"),/No activity recorded/);
+run("state.directoryFilters.sort='recent'");assert.match(run('crmDirectoryHeader()'),/aria-sort="descending"/);
+run("state.appointmentFilters=defaultAppointmentFilters();state.appointmentFilters.sort='namedesc'");assert.deepEqual(Array.from(run('filteredAppointments().map(r=>r.name)')),['Zoe Demo','Ben Demo','Ada Demo']);
+console.log('PASS: directory name/reference search, sort directions and activity fallbacks, combined lifecycle/category/invitation/counselor filters, ID-only links, appointment filters and leap-year calendar.');
