@@ -19,7 +19,7 @@ function submit(name='Jordan Demo') {
  event('[data-booking-form]',{}, {name,concern:'Anxiety',format:'Telehealth'},'submit');
 }
 run("state.view='admin';state.activeAdminPanel='overview'");
-assert.match(run('adminDashboard()'),/Session Referrals/);
+assert.match(run('adminDashboard()'),/New Referrals/);
 assert.doesNotMatch(run('adminDashboard()'),/\+18%|Executive CRM/);
 event('[data-prayer-submit]',{}, {name:'Jordan Demo',category:'Family',followup:'yes'},'submit');
 assert.equal(run('prayerQueue()[0].session'),true);
@@ -36,7 +36,7 @@ event('[data-profile-details]',{profileDetails:run('careRecords()[0].id')});asse
 event('[data-demo-review]',{demoReview:String(run('appointmentRequests[0].id'))});
 assert.equal(run('state.demoRequests.length'),1);assert.equal(run('state.demoRequests[0].status'),'New');
 assert.match(run('state.demoRequests[0].source'),/Session copy/);
-assert.match(run('kanbanBoard()'),/Session-created referrals only/);
+assert.match(run('kanbanBoard()'),/Session referrals only/);
 assert.doesNotMatch(run('assessmentPanel(selectedCareRecord(),true)'),/data-diagnosis-save|Clinician-authored documentation/);
 assert.doesNotMatch(run('treatmentPanel(selectedCareRecord(),true)'),/data-assessment-assign/);
 assert.match(run('integrationCenter()'),/Client care records|Technical information/);

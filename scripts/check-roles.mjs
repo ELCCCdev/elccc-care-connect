@@ -34,5 +34,5 @@ run("selectDemoRole('Admin');selectDemoRole('Client')");assert.equal(run('select
 run("state.activeRequestId="+JSON.stringify(original));assert.notEqual(run('clientReference(selectedCareRecord())'),reference);
 event('[data-visitor]',{});assert.equal(run('state.demoRole'),null);assert.equal(run('state.view'),'home');assert.equal(run('state.demoRequests.length'),1);
 run("state.view='admin'");assert.match(run('currentView()'),/A compassionate place to begin/);
-assert.match(run('loginModal()'),/not authentication or access protection/);assert.doesNotMatch(run('loginModal()'),/Demo credentials|password input/);
+assert.match(run('loginModal()'),/does not sign you in or provide secure access/);assert.doesNotMatch(run('loginModal()'),/Demo credentials|password input/);
 console.log('PASS: welcome role selection, role-scoped navigation/tours, direct-view fallback, visitor services, stable distinct client references, preserved session state and explicit non-authentication labels.');

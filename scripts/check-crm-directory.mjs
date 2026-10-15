@@ -19,7 +19,7 @@ run("state.managedLists.established[0].fictional_client_name='Zoe Demo'");assert
 run("state.appointmentFilters=defaultAppointmentFilters()");assert.equal(run('filteredAppointments().length'),1);
 run("state.appointmentFilters.search='rachel'");assert.equal(run('filteredAppointments().length'),1);
 run("state.appointmentFilters.status='Cancelled'");assert.equal(run('filteredAppointments().length'),0);
-run("state.appointmentFilters=defaultAppointmentFilters();state.appointmentFilters.date='2099-01-01';state.appointmentFilters.type='Consultation simulation'");assert.equal(run('filteredAppointments().length'),1);
+run("state.appointmentFilters=defaultAppointmentFilters();state.appointmentFilters.date='2099-01-01';state.appointmentFilters.type='Consultation (test)'");assert.equal(run('filteredAppointments().length'),1);
 run("state.appointmentFilters.date='2099-01-02'");assert.equal(run('filteredAppointments().length'),0);
 run("state.appointmentFilters=defaultAppointmentFilters();state.appointmentFilters.source='historical'");assert.equal(run('filteredAppointments().length'),50);
 run("state.appointmentFilters.month='2028-02'");assert.match(run('calendarPreview()'),/2028-02-29/);assert.doesNotMatch(run('calendarPreview()'),/2028-02-30/);

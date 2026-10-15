@@ -38,5 +38,5 @@ assert.equal(run('state.demoRequests[0].status'),'Assigned'); assert.match(run('
 run('state.demoCounselorId = "melissa-smith"'); assert.doesNotMatch(run('demoCounselorPanel()'),/Jordan Demo/);
 for (const view of ['home','counselors','quiz','resources','client','counselor','admin']) {run(`state.view = '${view}'; render()`); assert.ok(root.innerHTML.length>1000); assert.match(root.innerHTML,/← Home/);}
 for (const fn of ['counselorProfileModal(counselors[0])','clientProfileModal(clients[0])','loginModal()','presentationModal()']) assert.ok(run(fn).length>100);
-assert.match(run('bookingModal(counselors[0])'),/fictional/i);
+assert.match(run('bookingModal(counselors[0])'),/test record/i);
 console.log('PASS: submission, review, assignment, scheduling, cross-role views, past-date and conflict rejection, counselor isolation, all existing views and modals.');

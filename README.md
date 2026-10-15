@@ -666,3 +666,44 @@ header twice, then change the dropdown and verify its arrow updates. Search and
 filter results should remain scoped. Sort buttons support keyboard activation and
 expose their direction through `aria-sort`. Backend, database, scheduling, and
 integration behavior are unchanged.
+
+## Intake and onboarding refinement
+
+Branch **codex/elccc-intake-onboarding-refinement** uses professional interface
+labels such as Submit Request, Switch Role, Open Profile, Intake Checklist, and
+Portal Invitation Status. A development-environment banner, test-record badges,
+and concise capability notes remain. These labels do not enable production services.
+
+The saved client profile now includes a derived **Onboarding checklist** covering
+inquiry, conversion, counselor assignment, intake, questionnaire availability,
+appointments, portal tracking and communications. Saved versus session-only steps
+are distinguished. Where a referral is linked by inquiry ID, **Open intake checklist**
+and **Review assignment and appointments** reuse that record rather than asking
+for another inquiry. Test intake status carries forward across conversion within
+that page session; it is not yet stored in SQLite. Unavailable questionnaires and
+communications cannot be marked complete.
+
+The [intake/onboarding review and implementation plan](docs/INTAKE_ONBOARDING_PLAN.md)
+explains persistent versus session-only features, a proposed durable checklist/task
+model, and phased priorities for authentication, server authorization, secure data
+handling, persistent intake, administrative workflows and native scheduling. Valant
+calendar/API access is not assumed and remains a separate evaluation.
+
+To review with your existing local servers:
+
+```bash
+git fetch origin
+git switch codex/elccc-intake-onboarding-refinement
+```
+
+Restart the backend only if needed, keep the frontend at port 5500, and hard refresh
+Chrome. Submit a test inquiry, open Clients → Prospective Clients → Open profile,
+review its checklist, complete the linked intake checklist, then confirm conversion.
+The checklist and original inquiry reference remain associated. Reloading retains
+saved inquiry/conversion/portal state but clears session-only progress as documented.
+Do not enter real personal or clinical information. No backend schema, request
+schema, authentication, live scheduling, messaging or integration is added.
+
+Run the existing backend/frontend suites plus `node scripts/check-onboarding.mjs`.
+Browser checks use the updated visible labels while retaining their behavioral
+assertions for search, sorting, filters, intake, conversion, tracking and persistence.

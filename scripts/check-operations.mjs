@@ -49,7 +49,7 @@ event('[data-assessment-assign]',{assessmentAssign:'demo-1'},{assessment:'0'},'s
 run('state.view="client"');event('[data-assessment-submit]',{assessmentSubmit:'assessment-1',careClient:'demo-1'},{q0:'2',q1:'1',q2:'2'},'submit');
 assert.equal(run('careDetails(selectedCareRecord()).assessments[0].score'),5);
 assert.equal(run('careDetails(selectedCareRecord()).diagnosis'),undefined);
-const documentation={code:'Z63.0',status:'Confirmed',rationale:'Fictional interview rationale',goal:'Fictional practice goal',followup:'Demo follow-up',ack:'manual'};
+const documentation={code:'Z63.0',status:'Confirmed',rationale:'Fictional interview rationale',goal:'Fictional practice goal',followup:'Follow-up',ack:'manual'};
 event('[data-diagnosis-save]',{diagnosisSave:'demo-1'},documentation,'submit');assert.equal(run('careDetails(selectedCareRecord()).diagnosis'),undefined);
 run('state.view="admin"');event('[data-diagnosis-save]',{diagnosisSave:'demo-1'},documentation,'submit');assert.equal(run('careDetails(selectedCareRecord()).diagnosis'),undefined);
 run('state.view="counselor";state.clinicianMode="coordinator"');event('[data-diagnosis-save]',{diagnosisSave:'demo-1'},documentation,'submit');assert.equal(run('careDetails(selectedCareRecord()).diagnosis'),undefined);

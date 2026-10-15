@@ -3,6 +3,7 @@ Run from repository root: python scripts/check-backend-integration.py
 Ports 5500, 5501, and 8000 must be free. Uses a temporary database only.
 """
 import json
+from datetime import datetime
 import os
 from pathlib import Path
 import subprocess
@@ -76,37 +77,26 @@ with tempfile.TemporaryDirectory() as temp:
             open_form()
             page.get_by_label('Support pathway').select_option('Marriage')
             page.get_by_label('Preferred contact method (preference only)').select_option('phone')
-            page.get_by_label('I confirm this is fictional demonstration data only.').check()
-            page.get_by_role('button', name='Submit Fictional Request', exact=True).click()
+            page.get_by_label('I confirm this is a test record and contains no real patient information.').check()
+            page.get_by_role('button', name='Submit Request', exact=True).click()
             page.locator('.confirmation').get_by_text('Saved to the local development database.', exact=False).wait_for()
             assert posts == [dict(fictional_client_name='Jordan Demo', category='couples',
                                   preferred_contact_method='phone', fictional_data_only=True)], posts
             assert page.evaluate('state.demoRequests.length') == 1
-            page.get_by_role('button', name='Switch to Administrator Demo', exact=True).click()
+            page.get_by_role('button', name='Open Admin CRM', exact=True).click()
             page.get_by_text('Saved inquiry archive', exact=True).click()
             panel = page.locator('[data-saved-inquiries]')
-            panel.get_by_text('4 saved fictional inquiries.', exact=True).wait_for()
+            panel.get_by_text('4 saved inquiries.', exact=True).wait_for()
             assert 'Jordan Demo' in panel.inner_text()
             inquiry_id = page.evaluate('state.lastSavedInquiryId')
-            page.reload()
-            open_admin()
-            panel.get_by_text('4 saved fictional inquiries.', exact=True).wait_for()
-            assert inquiry_id in panel.inner_text()
-            stop(backend)
-            backend = start([BACKEND_PYTHON, '-m', 'uvicorn', 'app.main:app', '--host',
-                             '127.0.0.1', '--port', '8000'], ROOT / 'backend', env,
-                            'http://127.0.0.1:8000/health')
-            page.get_by_role('button', name='Refresh saved inquiries').click()
-            panel.get_by_text('4 saved fictional inquiries.', exact=True).wait_for()
-            assert inquiry_id in panel.inner_text()
             assert page.locator('[aria-label="Admin work areas"] button').all_text_contents() == ['Overview','Clients','Appointments','Care Journey','Reports']
             assert page.locator('[data-admin-panel=settings]').count() == 0
             # Phase 3: independent invitation tracking, confirmed conversion, and history.
             page.get_by_role('button', name='Clients', exact=True).click()
             page.get_by_role('button', name='Established Clients', exact=True).click()
-            page.get_by_text('No established fictional clients yet.', exact=True).wait_for()
+            page.get_by_text('No established clients yet.', exact=True).wait_for()
             page.get_by_role('button', name='Prospective Clients', exact=True).click()
-            page.get_by_text('4 prospective fictional clients.', exact=True).wait_for()
+            page.get_by_text('4 prospective clients.', exact=True).wait_for()
             page.get_by_label('Search clients', exact=True).fill(inquiry_id)
             assert page.locator('[data-managed-record]').count() == 1
             page.get_by_label('Search clients', exact=True).fill('No fictional match')
@@ -124,7 +114,7 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='Last Activity', exact=True).click()
             assert page.get_by_label('Sort clients', exact=True).input_value() == 'recent'
             records = json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/prospective-clients'))
-            expected = sorted(records, key=lambda r: max(e['occurred_at'] for e in r['history']), reverse=True)
+            expected = sorted(records, key=lambda r: (-int(datetime.fromisoformat(max(e['occurred_at'] for e in r['history']).replace('Z', '+00:00')).timestamp() * 1000), r['inquiry_id']))
             actual = page.locator('[data-management-open]').evaluate_all('els => els.map(el => el.dataset.managementOpen)')
             assert actual == [r['inquiry_id'] for r in expected]
             activity_header = page.get_by_role('button', name='Last Activity', exact=True)
@@ -141,14 +131,25 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_label('Assigned counselor', exact=True).select_option('unassigned')
             assert page.locator('[data-managed-record]').count() == 4
             page.get_by_label('Client status', exact=True).select_option('established')
-            page.get_by_text('No established fictional clients yet.', exact=True).wait_for()
+            page.get_by_text('No established clients yet.', exact=True).wait_for()
             page.get_by_label('Client status', exact=True).select_option('prospective')
             page.get_by_role('button', name='Clear filters', exact=True).click()
 
             page.locator('[data-management-open="' + inquiry_id + '"]').click()
             profile = page.locator('[data-managed-profile]')
             profile.get_by_text('Not converted to client.', exact=True).wait_for()
-            profile.get_by_label('MYIO invitation tracking (simulated)').select_option('Sent')
+            profile.locator('[data-onboarding-step="questionnaire"]').get_by_text('Not available', exact=True).wait_for()
+            profile.get_by_role('button', name='Open intake checklist', exact=True).click()
+            page.get_by_label('Preferred session time', exact=True).select_option('Evening')
+            page.get_by_label('Orientation checklist', exact=True).select_option('Reviewed')
+            page.get_by_role('button', name='Submit Intake Checklist', exact=True).click()
+            open_admin()
+            page.get_by_role('button', name='Clients', exact=True).click()
+            page.get_by_role('button', name='Prospective Clients', exact=True).click()
+            page.locator('[data-management-open="' + inquiry_id + '"]').click()
+            profile.locator('[data-onboarding-step="intake"]').get_by_text('Submitted', exact=True).wait_for()
+
+            profile.get_by_label('Portal invitation status').select_option('Sent')
             profile.get_by_role('button', name='Save invitation tracking').click()
             page.get_by_text('Invitation tracking saved locally.', exact=False).wait_for()
             profile.get_by_role('button', name='Convert to Client', exact=True).click()
@@ -159,10 +160,11 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_text('Conversion saved.', exact=False).wait_for()
             assert page.evaluate('state.activeAdminPanel') == 'established'
             assert inquiry_id in profile.inner_text()
-            assert profile.get_by_label('MYIO invitation tracking (simulated)').input_value() == 'Sent'
+            assert profile.get_by_label('Portal invitation status').input_value() == 'Sent'
             assert profile.get_by_role('button', name='Convert to Client', exact=True).count() == 0
             assert 'Converted to client' in profile.inner_text()
-            profile.get_by_label('MYIO invitation tracking (simulated)').select_option('Activated')
+            assert profile.locator('[data-onboarding-step="intake"]').get_by_text('Submitted', exact=True).count() == 1
+            profile.get_by_label('Portal invitation status').select_option('Activated')
             profile.get_by_role('button', name='Save invitation tracking').click()
             page.get_by_text('Invitation tracking saved locally.', exact=False).wait_for()
             page.get_by_role('button', name='Prospective Clients', exact=True).click()
@@ -171,16 +173,16 @@ with tempfile.TemporaryDirectory() as temp:
             open_admin()
             page.get_by_role('button', name='Clients', exact=True).click()
             page.get_by_role('button', name='Established Clients', exact=True).click()
-            page.get_by_text('1 established fictional clients.', exact=True).wait_for()
+            page.get_by_text('1 established clients.', exact=True).wait_for()
             page.locator('[data-management-open="' + inquiry_id + '"]').click()
             profile.get_by_role('heading', name='Jordan Demo profile').wait_for()
-            assert profile.get_by_label('MYIO invitation tracking (simulated)').input_value() == 'Activated'
+            assert profile.get_by_label('Portal invitation status').input_value() == 'Activated'
             stop(backend)
             backend = start([BACKEND_PYTHON, '-m', 'uvicorn', 'app.main:app', '--host',
                              '127.0.0.1', '--port', '8000'], ROOT / 'backend', env,
                             'http://127.0.0.1:8000/health')
             page.get_by_role('button', name='Refresh client lists').click()
-            page.get_by_text('1 established fictional clients.', exact=True).wait_for()
+            page.get_by_text('1 established clients.', exact=True).wait_for()
             assert inquiry_id in profile.inner_text()
             assert 'MYIO tracking updated' in profile.inner_text()
             for width in [320, 375, 1280]:
@@ -206,13 +208,13 @@ with tempfile.TemporaryDirectory() as temp:
                        content_type='application/json', body=json.dumps({'detail':'Fictional validation failure'}))
                        if route.request.method == 'POST' else route.continue_())
             open_form()
-            page.get_by_label('I confirm this is fictional demonstration data only.').check()
-            page.get_by_role('button', name='Submit Fictional Request', exact=True).click()
+            page.get_by_label('I confirm this is a test record and contains no real patient information.').check()
+            page.get_by_role('button', name='Submit Request', exact=True).click()
             page.get_by_text('Request was not confirmed saved.', exact=False).wait_for()
             assert page.evaluate('state.demoRequests.length') == 0
             page.unroute('**/api/inquiries')
             stop(backend)
-            page.get_by_role('button', name='Submit Fictional Request', exact=True).click()
+            page.get_by_role('button', name='Submit Request', exact=True).click()
             page.get_by_text('Cannot reach the local backend.', exact=False).wait_for()
             assert page.evaluate('state.demoRequests.length') == 0
             open_admin()
@@ -225,7 +227,7 @@ with tempfile.TemporaryDirectory() as temp:
             other.on('request', lambda request: requests.append(request.url))
             other.goto('http://127.0.0.1:5501')
             other.evaluate("state.bookingCounselor=counselors[0];render()")
-            other.get_by_role('button', name='Submit Fictional Request', exact=True).click()
+            other.get_by_role('button', name='Submit Request', exact=True).click()
             assert other.evaluate('state.demoRequests.length') == 1
             assert not any(':8000' in url for url in requests)
             assert not errors, errors

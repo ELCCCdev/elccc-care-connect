@@ -10,14 +10,14 @@ const url=process.env.PROTOTYPE_URL || 'http://127.0.0.1:4173/';
 page.on('request',r=>{if(!r.url().startsWith(new URL(url).origin))external.push(r.url());});
 const role=name=>page.getByRole('button',{name,exact:true});
 async function primary(view) {const button=page.locator(`#primary-navigation [data-view="${view}"]`);if(!await button.isVisible())await role('Menu').click();await button.click();}
-async function switchDemoRole(roleName){await page.getByRole('button',{name:'Switch Demo Role',exact:true}).click();const modal=page.locator('.modal-backdrop');await modal.locator(`[data-role="${roleName}"]`).click();await modal.locator('[data-login-continue]').click();}
+async function switchDemoRole(roleName){await page.getByRole('button',{name:'Switch Role',exact:true}).click();const modal=page.locator('.modal-backdrop');await modal.locator(`[data-role="${roleName}"]`).click();await modal.locator('[data-login-continue]').click();}
 try {
  await page.goto(url);
  await switchDemoRole('Admin');
- assert.match(await page.locator('main').innerText(),/Fictional Center Snapshot/);
+ assert.match(await page.locator('main').innerText(),/Center Overview/);
  await page.locator('[data-admin-panel=prayer]').first().click();
- await page.getByLabel('Fictional requester').selectOption('Morgan Sample');
- await role('Submit Fictional Prayer Request').click();
+ await page.getByLabel('Requester').selectOption('Morgan Sample');
+ await role('Submit Prayer Request').click();
  assert.match(await page.locator('main').innerText(),/No message was sent/);
  await page.locator('[data-prayer-action][data-action=prayed]').first().click();
  await page.locator('[data-prayer-action][data-action=followed]').first().click();
@@ -25,10 +25,10 @@ try {
  await page.getByRole('button',{name:'Clients',exact:true}).click();await page.locator('[data-admin-panel=clients]').click();
  await role('View Profile Details').click();await role('Complete Administrative Follow-up').click();
  assert.match(await page.locator('main').innerText(),/No external message was sent/);
- await page.getByLabel('Admin fictional profile').selectOption('sample-'+await page.evaluate(()=>clients[1].id));
+ await page.getByLabel('Client profile').selectOption('sample-'+await page.evaluate(()=>clients[1].id));
  assert.equal(await role('Complete Administrative Follow-up').count(),1);
  await page.locator('[data-admin-panel=appointments]').first().click();
- await page.getByText('Historical Referral Samples',{exact:true}).first().click();await role('Create Fictional Referral').first().click();
+ await page.getByText('Archived Referrals',{exact:true}).first().click();await role('Create Referral').first().click();
  await role('Review & Mark Contacted').click();
  assert.match(await page.locator('main').innerText(),/Contacted/);
  for(const width of [320,375,768,1024,1440,1920]){
