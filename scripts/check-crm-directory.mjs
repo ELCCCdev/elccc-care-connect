@@ -1,0 +1,31 @@
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const root={innerHTML:''};const document={getElementById:()=>root,querySelectorAll:()=>[],querySelector:()=>null};
+const context=vm.createContext({document,window:{scrollTo(){}},console});
+vm.runInContext(readFileSync('index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1],context);
+const run=code=>vm.runInContext(code,context);const ids=()=>Array.from(run('filteredManagedRecords().map(r=>r.inquiry_id)'));
+run(`state.activeAdminPanel='prospective';state.managedLists={prospective:[{inquiry_id:'ref-b',fictional_client_name:'Zoe Demo',category:'family',portal_status:'Sent',created_at:'2026-01-01T00:00:00Z',converted_at:null,history:[{occurred_at:'2026-04-01T00:00:00Z'}]},{inquiry_id:'ref-a',fictional_client_name:'Avery Demo',category:'individual',portal_status:'Not Sent',created_at:'2026-02-01T00:00:00Z',converted_at:null,history:[]}],established:[{inquiry_id:'ref-c',fictional_client_name:'Morgan Demo',category:'couples',portal_status:'Activated',created_at:'2025-01-01T00:00:00Z',converted_at:'2026-03-01T00:00:00Z',history:[{occurred_at:'2026-03-01T00:00:00Z'}]}]};`);
+assert.deepEqual(ids(),['ref-a','ref-b']);
+for(const [sort,expected] of [['za',['ref-b','ref-a']],['recent',['ref-b','ref-a']],['oldest',['ref-a','ref-b']],['newest',['ref-a','ref-b']]]){run(`state.directoryFilters.sort='${sort}'`);assert.deepEqual(ids(),expected);}
+run("state.directoryFilters.search='REF-B'");assert.deepEqual(ids(),['ref-b']);
+run("state.directoryFilters=defaultDirectoryFilters();state.directoryFilters.category='family';state.directoryFilters.portal='Sent'");assert.deepEqual(ids(),['ref-b']);
+run("state.directoryFilters.portal='Activated'");assert.deepEqual(ids(),[]);
+run("state.directoryFilters=defaultDirectoryFilters();state.directoryFilters.lifecycle='all';state.directoryFilters.sort='status'");assert.deepEqual(ids(),['ref-a','ref-b','ref-c']);
+run("state.demoRequests=[{id:'demo-1',inquiryId:'ref-b',name:'Zoe Demo',demo:true,counselorId:'rachel-kim',status:'Scheduled',concern:'Family',appointment:{date:'2099-01-01',time:'09:00'}}];state.directoryFilters.counselor='rachel-kim'");assert.deepEqual(ids(),['ref-b']);
+run("state.directoryFilters.counselor='unassigned'");assert.deepEqual(ids(),['ref-a','ref-c']);
+// No name-only linkage, including duplicate display names.
+run("state.managedLists.established[0].fictional_client_name='Zoe Demo'");assert.deepEqual(ids(),['ref-a','ref-c']);
+run("state.appointmentFilters=defaultAppointmentFilters()");assert.equal(run('filteredAppointments().length'),1);
+run("state.appointmentFilters.search='rachel'");assert.equal(run('filteredAppointments().length'),1);
+run("state.appointmentFilters.status='Cancelled'");assert.equal(run('filteredAppointments().length'),0);
+run("state.appointmentFilters=defaultAppointmentFilters();state.appointmentFilters.date='2099-01-01';state.appointmentFilters.type='Consultation simulation'");assert.equal(run('filteredAppointments().length'),1);
+run("state.appointmentFilters.date='2099-01-02'");assert.equal(run('filteredAppointments().length'),0);
+run("state.appointmentFilters=defaultAppointmentFilters();state.appointmentFilters.source='historical'");assert.equal(run('filteredAppointments().length'),50);
+run("state.appointmentFilters.month='2028-02'");assert.match(run('calendarPreview()'),/2028-02-29/);assert.doesNotMatch(run('calendarPreview()'),/2028-02-30/);
+run("state.demoRequests.push({id:'demo-2',name:'Ada Demo',demo:true,counselorId:'rachel-kim',status:'Scheduled',appointment:{date:'2098-01-01',time:'10:00'}},{id:'demo-3',name:'Ben Demo',demo:true,counselorId:null,status:'New'});state.appointmentFilters=defaultAppointmentFilters()");
+assert.deepEqual(Array.from(run('filteredAppointments().map(r=>r.name)')),['Ada Demo','Zoe Demo','Ben Demo']);
+run("state.appointmentFilters.sort='latest'");assert.deepEqual(Array.from(run('filteredAppointments().map(r=>r.name)')),['Zoe Demo','Ada Demo','Ben Demo']);
+run("state.appointmentFilters.sort='name'");assert.deepEqual(Array.from(run('filteredAppointments().map(r=>r.name)')),['Ada Demo','Ben Demo','Zoe Demo']);
+run("state.appointmentFilters.view='calendar';state.appointmentFilters.month='2098-01'");assert.equal(run('filteredAppointments().length'),1);
+console.log('PASS: directory name/reference search, six sort choices, combined lifecycle/category/invitation/counselor filters, ID-only links, appointment filters and leap-year calendar.');

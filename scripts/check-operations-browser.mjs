@@ -14,6 +14,20 @@ async function switchDemoRole(roleName){await page.getByRole('button',{name:'Swi
 try {
  await page.goto(url);
  await switchDemoRole('Client');await role('Start Another Demo Request').click();await role('Submit Fictional Request').click();await role('Switch to Administrator Demo').click();await role('Review & Mark Contacted').click();await page.getByLabel('Assign counselor').selectOption('rachel-kim');await role('Confirm Assignment').click();await page.getByLabel('Appointment date',{exact:false}).fill('2099-01-01');await role('Confirm Demo Appointment').click();
+ // Administrative appointment directory controls exercise the existing scheduled record.
+ await page.getByLabel('Search appointments',{exact:true}).fill('Jordan');
+ await page.getByLabel('Appointment counselor',{exact:true}).selectOption('rachel-kim');
+ await page.getByLabel('Filter by date',{exact:true}).fill('2099-01-01');
+ await page.getByLabel('Filter by date',{exact:true}).press('Tab');
+ assert.equal(await page.locator('[data-appointment-row]').count(),1);
+ await page.getByLabel('Appointment status',{exact:true}).selectOption('Cancelled');
+ assert.equal(await page.locator('[data-appointment-row]').count(),0);
+ await page.getByLabel('Appointment status',{exact:true}).selectOption('Confirmed');
+ await role('Calendar preview').click();await page.getByLabel('Calendar month',{exact:true}).fill('2099-01');await page.getByLabel('Calendar month',{exact:true}).press('Tab');
+ await page.getByRole('button',{name:'2099-01-01, 1 appointments',exact:true}).click();
+ assert.equal(await page.locator('[data-appointment-row]').count(),1);
+ await role('Review appointment').click();await page.getByRole('heading',{name:'Jordan Demo appointment',exact:true}).waitFor();await role('Close appointment review').click();
+ await role('Clear filters').click();
  // Approval Settings is hidden; seed the retained routing logic for this regression.
  await page.evaluate(()=>{state.approvalMode='counselor';});
  await switchDemoRole('Client');await page.getByLabel('Requested date').fill('2099-01-02');await page.getByLabel('Requested time (Eastern Time)').selectOption('11:00');await role('Request Demo Reschedule').click();

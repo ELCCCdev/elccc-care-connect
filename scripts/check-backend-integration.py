@@ -64,6 +64,9 @@ with tempfile.TemporaryDirectory() as temp:
 
             def open_admin():
                 page.evaluate("state.bookingCounselor=null;selectDemoRole('Admin');state.activeAdminPanel='appointments';render()")
+                archive = page.get_by_text('Saved inquiry archive', exact=True)
+                if not archive.evaluate('el => el.parentElement.open'):
+                    archive.click()
 
             page.goto('http://127.0.0.1:5500')
             for pathway, category in [('Anxiety', 'individual'), ('Grief', 'individual'),
@@ -80,6 +83,7 @@ with tempfile.TemporaryDirectory() as temp:
                                   preferred_contact_method='phone', fictional_data_only=True)], posts
             assert page.evaluate('state.demoRequests.length') == 1
             page.get_by_role('button', name='Switch to Administrator Demo', exact=True).click()
+            page.get_by_text('Saved inquiry archive', exact=True).click()
             panel = page.locator('[data-saved-inquiries]')
             panel.get_by_text('4 saved fictional inquiries.', exact=True).wait_for()
             assert 'Jordan Demo' in panel.inner_text()
@@ -103,6 +107,26 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_text('No established fictional clients yet.', exact=True).wait_for()
             page.get_by_role('button', name='Prospective Clients', exact=True).click()
             page.get_by_text('4 prospective fictional clients.', exact=True).wait_for()
+            page.get_by_label('Search clients', exact=True).fill(inquiry_id)
+            assert page.locator('[data-managed-record]').count() == 1
+            page.get_by_label('Search clients', exact=True).fill('No fictional match')
+            page.get_by_text('No clients match the current filters.', exact=True).wait_for()
+            page.get_by_role('button', name='Clear filters', exact=True).click()
+            page.get_by_label('Sort clients', exact=True).select_option('za')
+            names = page.locator('[data-managed-record] h3').all_text_contents()
+            assert names == sorted(names, reverse=True)
+            page.get_by_label('Inquiry category', exact=True).select_option('couples')
+            assert page.locator('[data-managed-record]').count() == 1
+            page.get_by_label('Onboarding status', exact=True).select_option('Sent')
+            assert page.locator('[data-managed-record]').count() == 0
+            page.get_by_role('button', name='Clear filters', exact=True).click()
+            page.get_by_label('Assigned counselor', exact=True).select_option('unassigned')
+            assert page.locator('[data-managed-record]').count() == 4
+            page.get_by_label('Client status', exact=True).select_option('established')
+            page.get_by_text('No established fictional clients yet.', exact=True).wait_for()
+            page.get_by_label('Client status', exact=True).select_option('prospective')
+            page.get_by_role('button', name='Clear filters', exact=True).click()
+
             page.locator('[data-management-open="' + inquiry_id + '"]').click()
             profile = page.locator('[data-managed-profile]')
             profile.get_by_text('Not converted to client.', exact=True).wait_for()

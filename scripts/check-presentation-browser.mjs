@@ -28,7 +28,7 @@ try {
  await page.getByLabel('Admin fictional profile').selectOption('sample-'+await page.evaluate(()=>clients[1].id));
  assert.equal(await role('Complete Administrative Follow-up').count(),1);
  await page.locator('[data-admin-panel=appointments]').first().click();
- await role('Create Fictional Referral').first().click();
+ await page.getByText('Historical Referral Samples',{exact:true}).first().click();await role('Create Fictional Referral').first().click();
  await role('Review & Mark Contacted').click();
  assert.match(await page.locator('main').innerText(),/Contacted/);
  for(const width of [320,375,768,1024,1440,1920]){

@@ -560,3 +560,84 @@ Workspace → Intake → **Future native intake**. Both notes are expandable to 
 the working interface compact. The calendar preview now describes native booking
 with optional synchronization. No live scheduling, new intake collection, database
 migration, external connection, notification delivery, deployment, or merge is added.
+
+## Admin CRM directory and appointments refinement
+
+Review branch **codex/elccc-admin-crm-refinement**, based on the native scheduling
+planning branch. No backend or database changes are required.
+
+From your existing repository root:
+
+```bash
+git fetch origin
+git switch codex/elccc-admin-crm-refinement
+cd backend
+source .venv/bin/activate
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+In a second Terminal, from the repository root:
+
+```bash
+python3 -m http.server 5500 --bind 127.0.0.1
+```
+
+Use your existing Live Server if port 5500 is occupied. Stop the old backend before
+starting another. Open http://127.0.0.1:5500 and hard refresh with Command+Shift+R.
+Keep your existing SQLite file; do not reset it.
+
+### Review Clients
+
+- Open Administrator → Clients → Prospective Clients or Established Clients.
+- Search by fictional name or inquiry reference. Try Name A–Z/Z–A, activity dates,
+  newest inquiry, and client-status sorting. Combine counselor, category, and
+  onboarding filters. The onboarding filter uses manual MYIO invitation statuses.
+- Client status can switch between prospective, established, or all records.
+  Clear filters restores the current section. Filters remain while you open/close
+  a profile and navigate between client sections, until page refresh.
+- Open a profile, update invitation tracking, and confirm conversion. The original
+  inquiry ID/history remains. Activity history is chronological.
+
+Directory assignment and intake details come from an explicitly linked session
+referral (`inquiryId`), never from a name match. They are labeled as session-only
+and reset on refresh. Where no assignment/intake exists, the profile says Not
+assigned/Not collected. These fields are not fabricated or written to SQLite.
+Last activity uses stored creation/management history plus any linked session
+notifications; permanent history and session progress remain distinct.
+
+Search, sorting, and filtering run over the loaded fictional dataset in the browser.
+They are functional, but not server-side pagination/search or access controls.
+Future backend authorization is documented [separately](docs/FUTURE_AUTHORIZATION.md).
+
+### Review Appointments
+
+- Open Appointments for compact session listings. Use search, counselor, date,
+  simulated appointment type, status, source, and sorting controls together.
+- Session appointments are the default. Choose Historical examples or All examples
+  to inspect archived sample dates; they are not upcoming real appointments.
+- Switch to Calendar preview, select a month, and click a date to filter the list.
+  Counts honor the other filters. Displayed times remain Eastern Time; this is not
+  a live scheduling engine. Unscheduled referrals have no calendar date.
+- Review appointment opens its current summary and available change history.
+  Existing referral review, assignment, scheduling, rescheduling, cancellation,
+  and care controls remain below the compact workspace.
+- Saved inquiry archive, Historical Referral Samples, and Development notes are
+  expandable. The native scheduling plan remains available without occupying the
+  main workspace. No bookings, reminders, invitations, or external messages are sent.
+
+Only inquiry, conversion, and manual invitation tracking are persistent. Reports,
+care journeys, and unrelated demo features remain available. No Valant/MYIO
+connection, authentication, real patient data, or HIPAA compliance is introduced.
+
+### Checks
+
+Run the existing backend suite and frontend checks from earlier sections. Also run:
+
+```bash
+node scripts/check-crm-directory.mjs
+```
+
+The browser integration check now tests client search, sorting, combined filters,
+status navigation, conversion, and tracking. The operations browser check tests
+appointment search/filters, calendar selection, review, and existing care workflows.
+All browser fixtures use fictional data and disposable databases.
