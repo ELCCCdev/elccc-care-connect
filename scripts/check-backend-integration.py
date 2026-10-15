@@ -197,11 +197,11 @@ with tempfile.TemporaryDirectory() as temp:
                 page.screenshot(path=str(ROOT / 'work' / 'refined-established-mobile.png'), full_page=True)
                 page.set_viewport_size({'width': 1280, 'height': 900})
             # Profile/list errors are shown without inventing records.
-            page.route('**/api/clients', lambda route: route.fulfill(status=503,
+            page.route('**/api/clients?include_archived=true', lambda route: route.fulfill(status=503,
                        content_type='application/json', body='{"detail":"Database unavailable"}'))
             page.get_by_role('button', name='Refresh client lists').click()
             page.get_by_text('Could not load client lists.', exact=False).wait_for()
-            page.unroute('**/api/clients')
+            page.unroute('**/api/clients?include_archived=true')
             open_admin()
             # Failed POST does not fabricate a saved record; the user can retry.
             page.route('**/api/inquiries', lambda route: route.fulfill(status=422,

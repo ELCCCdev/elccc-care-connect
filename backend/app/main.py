@@ -1,6 +1,7 @@
 """Local-only fictional inquiries demo. Never store real patient information."""
 from contextlib import closing, asynccontextmanager
 from datetime import date, datetime, timezone
+import json
 import logging
 import os
 import re
@@ -95,11 +96,25 @@ class PreferenceRequest(InquiryCreate, PreferenceDetails):
         return self
 
 
+class ClientEdit(InquiryCreate):
+    status: Status
+    expected_revision: int = Field(ge=0)
+    email: Optional[str] = Field(default=None, max_length=254)
+    phone: Optional[str] = Field(default=None, max_length=32)
+
+
+class ArchiveRequest(ConversionRequest):
+    expected_revision: int = Field(ge=0)
+
+
 class ManagedInquiry(Inquiry):
     converted_at: Optional[datetime] = None
     portal_status: PortalStatus = 'Not Sent'
     history: list[HistoryEvent]
     preferences: Optional[PreferenceDetails] = None
+    original_inquiry: Inquiry
+    revision: int = 0
+    archived_at: Optional[datetime] = None
 
 def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
     """Factory allows tests to use disposable SQLite files."""
@@ -152,6 +167,11 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
             connection.execute("""CREATE TABLE IF NOT EXISTS preference_requests (
                 inquiry_id TEXT PRIMARY KEY REFERENCES inquiries(inquiry_id),
                 request_key TEXT NOT NULL UNIQUE, payload TEXT NOT NULL
+            )""")
+            connection.execute("""CREATE TABLE IF NOT EXISTS client_record_state (
+                inquiry_id TEXT PRIMARY KEY REFERENCES inquiries(inquiry_id),
+                edits TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 0,
+                archived_at TEXT
             )""")
             # Seed once per database, even when an existing database is later emptied.
             connection.execute('CREATE TABLE IF NOT EXISTS demo_metadata (key TEXT PRIMARY KEY)')
@@ -260,6 +280,18 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
         details = connection.execute('SELECT payload FROM preference_requests WHERE inquiry_id = ?', (str(inquiry_id),)).fetchone()
         if details:
             record['preferences'] = PreferenceDetails.model_validate_json(details['payload']).model_dump()
+        record['original_inquiry'] = dict(row)
+        current = connection.execute('SELECT * FROM client_record_state WHERE inquiry_id = ?',
+                                     (str(inquiry_id),)).fetchone()
+        if current:
+            edits = json.loads(current['edits'])
+            record.update({key: value for key, value in edits.items() if key not in ('email', 'phone')})
+            if record.get('preferences'):
+                record['preferences'].update({key: edits[key] for key in ('email', 'phone') if key in edits})
+            record['revision'] = current['revision']
+            record['archived_at'] = current['archived_at']
+        else:
+            record.update(revision=0, archived_at=None)
         record['history'] = [dict(action='Inquiry created', occurred_at=record['created_at'],
                                   detail='Original fictional inquiry received.')] + [
             dict(event) for event in connection.execute(
@@ -267,26 +299,113 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
                 (str(inquiry_id),))]
         return record
 
-    def management_list(converted):
+    def management_list(converted, include_archived=False):
         with closing(connect()) as connection:
             ids = connection.execute(
                 'SELECT i.inquiry_id FROM inquiries i LEFT JOIN inquiry_management m USING(inquiry_id) '
+                'LEFT JOIN client_record_state c USING(inquiry_id) '
                 + ('WHERE m.converted_at IS NOT NULL ' if converted else 'WHERE m.converted_at IS NULL ')
+                + ('' if include_archived else 'AND c.archived_at IS NULL ')
                 + 'ORDER BY i.created_at DESC, i.inquiry_id DESC').fetchall()
             return [managed_record(connection, row['inquiry_id']) for row in ids]
 
     @app.get('/api/prospective-clients', response_model=list[ManagedInquiry])
-    def prospective_clients():
-        return management_list(False)
+    def prospective_clients(include_archived: bool = False):
+        return management_list(False, include_archived)
 
     @app.get('/api/clients', response_model=list[ManagedInquiry])
-    def established_clients():
-        return management_list(True)
+    def established_clients(include_archived: bool = False):
+        return management_list(True, include_archived)
 
     @app.get('/api/inquiries/{inquiry_id}/management', response_model=ManagedInquiry)
     def get_management(inquiry_id: UUID):
         with closing(connect()) as connection:
             return managed_record(connection, inquiry_id)
+
+    def require_active(record):
+        if record['archived_at'] is not None:
+            raise HTTPException(status_code=409, detail='This record is archived. Restore it before making changes.')
+
+    def check_revision(record, expected):
+        if record['revision'] != expected:
+            raise HTTPException(status_code=409, detail='This record changed in another view. Cancel and reopen it before retrying.')
+
+    def advance_revision(connection, inquiry_id):
+        connection.execute(
+            'INSERT INTO client_record_state (inquiry_id, revision) VALUES (?, 1) '
+            'ON CONFLICT(inquiry_id) DO UPDATE SET revision = revision + 1', (str(inquiry_id),))
+
+    @app.post('/api/inquiries/{inquiry_id}/edit', response_model=ManagedInquiry)
+    def edit_client(inquiry_id: UUID, payload: ClientEdit):
+        with closing(connect()) as connection, connection:
+            connection.execute('BEGIN IMMEDIATE')
+            record = managed_record(connection, inquiry_id)
+            require_active(record)
+            check_revision(record, payload.expected_revision)
+            name = payload.fictional_client_name
+            if name != record['fictional_client_name'] and (not name.startswith('Test ') or len(name.split()) < 3):
+                raise HTTPException(status_code=422, detail='Use a synthetic full name such as Test Alex River.')
+            edits = payload.model_dump(exclude={'expected_revision', 'fictional_data_only', 'email', 'phone'})
+            for key in ('email', 'phone'):
+                value = getattr(payload, key)
+                if value is None:
+                    continue
+                if not record.get('preferences'):
+                    raise HTTPException(status_code=422, detail='This original inquiry has no contact details to edit.')
+                if key == 'email' and not re.fullmatch(r'[A-Za-z0-9._+-]+@example\.(com|org|net)', value):
+                    raise HTTPException(status_code=422, detail='Use an example.com, example.org, or example.net test email.')
+                if key == 'phone':
+                    value = re.sub(r'[^0-9]', '', value)
+                    if len(value) == 11 and value.startswith('1'):
+                        value = value[1:]
+                    if not re.fullmatch(r'[2-9][0-9]{2}55501[0-9]{2}', value):
+                        raise HTTPException(status_code=422, detail='Use a reserved test phone such as 202-555-0100.')
+                edits[key] = value
+            changes = [key for key, value in edits.items()
+                       if value != (record['preferences'].get(key) if key in ('email', 'phone') else record[key])]
+            if changes:
+                previous = connection.execute('SELECT edits FROM client_record_state WHERE inquiry_id = ?',
+                                              (str(inquiry_id),)).fetchone()
+                merged = json.loads(previous['edits']) if previous else {}
+                merged.update(edits)
+                connection.execute(
+                    'INSERT INTO client_record_state (inquiry_id, edits) VALUES (?, ?) '
+                    'ON CONFLICT(inquiry_id) DO UPDATE SET edits = excluded.edits',
+                    (str(inquiry_id), json.dumps(merged)))
+                advance_revision(connection, inquiry_id)
+                labels = {'fictional_client_name': 'name', 'category': 'counseling category',
+                          'preferred_contact_method': 'contact preference', 'status': 'inquiry review status',
+                          'email': 'email', 'phone': 'phone'}
+                connection.execute('INSERT INTO inquiry_history (inquiry_id, action, occurred_at, detail) VALUES (?, ?, ?, ?)',
+                                   (str(inquiry_id), 'Client details updated', datetime.now(timezone.utc).isoformat(),
+                                    'Updated: ' + ', '.join(labels[key] for key in changes) + '. Original inquiry preserved.'))
+            return managed_record(connection, inquiry_id)
+
+    def set_archive(inquiry_id, payload, archive):
+        with closing(connect()) as connection, connection:
+            connection.execute('BEGIN IMMEDIATE')
+            record = managed_record(connection, inquiry_id)
+            check_revision(record, payload.expected_revision)
+            if bool(record['archived_at']) == archive:
+                raise HTTPException(status_code=409, detail='This record is already archived.' if archive else 'This record is already active.')
+            timestamp = datetime.now(timezone.utc).isoformat()
+            connection.execute(
+                'INSERT INTO client_record_state (inquiry_id, archived_at) VALUES (?, ?) '
+                'ON CONFLICT(inquiry_id) DO UPDATE SET archived_at = excluded.archived_at',
+                (str(inquiry_id), timestamp if archive else None))
+            advance_revision(connection, inquiry_id)
+            connection.execute('INSERT INTO inquiry_history (inquiry_id, action, occurred_at, detail) VALUES (?, ?, ?, ?)',
+                               (str(inquiry_id), 'Client archived' if archive else 'Client restored', timestamp,
+                                'Removed from active directory; history retained.' if archive else 'Returned to active directory.'))
+            return managed_record(connection, inquiry_id)
+
+    @app.post('/api/inquiries/{inquiry_id}/archive', response_model=ManagedInquiry)
+    def archive_client(inquiry_id: UUID, payload: ArchiveRequest):
+        return set_archive(inquiry_id, payload, True)
+
+    @app.post('/api/inquiries/{inquiry_id}/restore', response_model=ManagedInquiry)
+    def restore_client(inquiry_id: UUID, payload: ArchiveRequest):
+        return set_archive(inquiry_id, payload, False)
 
     @app.post('/api/inquiries/{inquiry_id}/convert', response_model=ManagedInquiry)
     def convert_to_client(inquiry_id: UUID, payload: ConversionRequest):
@@ -294,6 +413,7 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
             # Serialize state transitions, including competing requests from other tabs.
             connection.execute('BEGIN IMMEDIATE')
             record = managed_record(connection, inquiry_id)
+            require_active(record)
             if record['converted_at'] is not None:
                 raise HTTPException(status_code=409, detail='This inquiry is already an established client. Refresh the list.')
             timestamp = datetime.now(timezone.utc).isoformat()
@@ -304,6 +424,7 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
             connection.execute('INSERT INTO inquiry_history (inquiry_id, action, occurred_at, detail) VALUES (?, ?, ?, ?)',
                                (str(inquiry_id), 'Converted to client', timestamp,
                                 'Confirmed fictional conversion in the ELCCC local workflow.'))
+            advance_revision(connection, inquiry_id)
             return managed_record(connection, inquiry_id)
 
     @app.post('/api/inquiries/{inquiry_id}/portal-status', response_model=ManagedInquiry)
@@ -311,6 +432,7 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
         with closing(connect()) as connection, connection:
             connection.execute('BEGIN IMMEDIATE')
             record = managed_record(connection, inquiry_id)
+            require_active(record)
             if record['portal_status'] != payload.portal_status:
                 timestamp = datetime.now(timezone.utc).isoformat()
                 connection.execute(
@@ -320,6 +442,7 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
                 connection.execute('INSERT INTO inquiry_history (inquiry_id, action, occurred_at, detail) VALUES (?, ?, ?, ?)',
                                    (str(inquiry_id), 'MYIO tracking updated', timestamp,
                                     record['portal_status'] + ' → ' + payload.portal_status + '; tracking only, no invitation sent.'))
+                advance_revision(connection, inquiry_id)
             return managed_record(connection, inquiry_id)
 
     return app

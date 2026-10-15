@@ -193,3 +193,21 @@ a different payload with that key returns 409. A new submission returns 201. Nam
 is never an identity key. Conversion retains these details and existing history.
 No appointment, invitation, intake document, or message is created or sent.
 Python 3.9+ and existing dependencies remain supported; no new dependency is needed.
+
+### Client profile editing and reversible archiving
+
+The `client_record_state` additive table stores current profile edits, revision,
+and archive timestamp separately from the original inquiry. Management responses
+add `original_inquiry`, `revision`, and `archived_at` while retaining existing fields.
+POST `/api/inquiries/{id}/edit` requires editable original inquiry fields, `status`,
+`fictional_data_only: true`, and `expected_revision`. Existing synthetic contact
+email/phone can also be corrected. Original inquiry endpoints remain immutable.
+
+POST `/api/inquiries/{id}/archive` and `/restore` each require `confirmed: true`
+and `expected_revision`. These are reversible operations; there is no permanent
+delete endpoint. The prospective/established list routes omit archived records by
+default; `?include_archived=true` includes them. Edits/archive/restore and existing
+conversion/invitation changes advance the revision. Stale writes return 409;
+archived clients must be restored before editing/conversion/invitation updates.
+All actual changes append history in the same transaction. No data reset or new
+dependency is required. See [local review instructions](../docs/CLIENT_RECORD_ACTIONS.md).

@@ -725,3 +725,18 @@ original inquiry UUID when converted. Existing backend routes remain compatible.
 Normal pages omit historical archive navigation and development planning panels.
 The retained historical/testing workspace is explicitly available at `?tools=1`.
 No authentication, real booking, paperwork delivery or external integration is added.
+
+## Client directory actions
+
+Branch `codex/elccc-client-record-actions` adds clickable client names, row
+double-click/Enter shortcuts, **View**, **Edit**, and confirmed **Delete** actions
+in both Prospective and Established Clients, keeping **Open profile** available.
+Delete archives the record; it never permanently removes inquiry or client history.
+Use **Record visibility → Archived records → Restore** to recover it.
+
+Edits and archive state persist in SQLite across refresh/restart. Cancel discards
+unsaved changes. The original inquiry stays unchanged; the CRM shows the current
+profile with its original reference and activity. Conflicting edits return a clear
+error. Synthetic data only; authentication and external integrations are unchanged.
+See the [Mac setup and review checklist](docs/CLIENT_RECORD_ACTIONS.md) for exact
+commands, editable fields, persistence boundaries, API details, and automated checks.
