@@ -6,8 +6,7 @@ import sqlite3
 import tempfile
 import unittest
 from uuid import uuid4
-from fastapi.testclient import TestClient
-from app.main import create_app
+from staff_fixtures import TestClient, create_app
 
 
 class ClientActionTests(unittest.TestCase):

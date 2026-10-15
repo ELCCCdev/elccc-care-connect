@@ -1,5 +1,22 @@
 # ELCCC Care Connect
 
+## Current phase: dedicated profiles and counselor assignments
+
+Use branch `codex/elccc-counselor-profile-pages`. Client names, row double-click,
+and View/Open profile open a separate tab with a stable inquiry UUID URL. Established
+clients can be assigned/reassigned/unassigned with confirmation; assignments and history
+persist. Counselor dashboards show backend-scoped caseloads and read-only profiles.
+
+Saved records now require **local staff access**; role selection alone is insufficient.
+Use `python -m app.staff` in the backend folder to display your generated local test keys.
+Use `python3 scripts/serve-local.py` from the root for port 5500; do not serve the whole
+repository with `python -m http.server`. The preview server blocks backend/database files.
+See [Mac setup, walkthrough, access limits and tests](docs/COUNSELOR_PROFILE_PAGES.md).
+Synthetic data only. Local staff sessions are not production-ready authentication;
+no real patient collection, live scheduling or external integrations are enabled.
+The older phase notes below describe historical branch behavior.
+
+
 ELCCC Client Portal, Counselor Workspace, and Administrative CRM stakeholder prototype built as a dependency-free, single-file `index.html` application using mock data only.
 
 ## Local preview

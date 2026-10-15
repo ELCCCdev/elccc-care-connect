@@ -12,6 +12,7 @@ import tempfile
 import time
 import urllib.request
 from playwright.sync_api import sync_playwright
+from browser_support import configure_staff, staff_login, legacy_profile_components
 
 ROOT = Path(__file__).resolve().parent.parent
 processes = []
@@ -42,12 +43,13 @@ def stop(process):
 with tempfile.TemporaryDirectory() as temp:
     env = os.environ.copy()
     env['ELCCC_DB_PATH'] = str(Path(temp) / 'inquiries.sqlite3')
+    configure_staff(env, temp)
     try:
         backend = start([BACKEND_PYTHON, '-m', 'uvicorn', 'app.main:app', '--host',
                          '127.0.0.1', '--port', '8000'], ROOT / 'backend', env,
                         'http://127.0.0.1:8000/health')
         for port in [5500, 5501]:
-            start([sys.executable, '-m', 'http.server', str(port), '--bind', '127.0.0.1'],
+            start([sys.executable, 'scripts/serve-local.py', '--port', str(port)],
                   ROOT, env, 'http://127.0.0.1:' + str(port))
         with sync_playwright() as p:
             executable = os.environ.get('CHROMIUM_PATH')
@@ -55,6 +57,8 @@ with tempfile.TemporaryDirectory() as temp:
                 executable = '/usr/bin/chromium'
             browser = p.chromium.launch(executable_path=executable, args=['--no-sandbox'])
             page = browser.new_page()
+            legacy_profile_components(page)
+            staff_login(page)
             errors, posts = [], []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.on('request', lambda request: posts.append(json.loads(request.post_data))
@@ -113,7 +117,7 @@ with tempfile.TemporaryDirectory() as temp:
             assert page.get_by_role('columnheader', name='Name', exact=True).get_attribute('aria-sort') == 'descending'
             page.get_by_role('button', name='Last Activity', exact=True).click()
             assert page.get_by_label('Sort clients', exact=True).input_value() == 'recent'
-            records = json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/prospective-clients'))
+            records = page.request.get('http://127.0.0.1:8000/api/prospective-clients').json()
             expected = sorted(records, key=lambda r: (-int(datetime.fromisoformat(max(e['occurred_at'] for e in r['history']).replace('Z', '+00:00')).timestamp() * 1000), r['inquiry_id']))
             actual = page.locator('[data-management-open]').evaluate_all('els => els.map(el => el.dataset.managementOpen)')
             assert actual == [r['inquiry_id'] for r in expected]
@@ -169,6 +173,7 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_text('Invitation tracking saved locally.', exact=False).wait_for()
             page.get_by_role('button', name='Prospective Clients', exact=True).click()
             assert page.locator('[data-management-open="' + inquiry_id + '"]').count() == 0
+            staff_login(page)
             page.reload()
             open_admin()
             page.get_by_role('button', name='Clients', exact=True).click()
@@ -181,6 +186,7 @@ with tempfile.TemporaryDirectory() as temp:
             backend = start([BACKEND_PYTHON, '-m', 'uvicorn', 'app.main:app', '--host',
                              '127.0.0.1', '--port', '8000'], ROOT / 'backend', env,
                             'http://127.0.0.1:8000/health')
+            staff_login(page)
             page.get_by_role('button', name='Refresh client lists').click()
             page.get_by_text('1 established clients.', exact=True).wait_for()
             assert inquiry_id in profile.inner_text()

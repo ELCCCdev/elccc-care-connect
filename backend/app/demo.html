@@ -10,7 +10,7 @@ body{font:16px/1.5 system-ui,sans-serif;background:#f3f6f5;color:#173e38;margin:
 <body><main>
 <p>ELCCC Care Connect · Phase 1 local backend</p>
 <h1>DEVELOPMENT DEMO</h1>
-<div class="warning"><strong>Fictional data only. Never enter real client or patient information.</strong><br>This local development prototype is not HIPAA-ready and has no authentication or authorization. Do not expose it publicly.</div>
+<div class="warning"><strong>Fictional data only. Never enter real client or patient information.</strong><br>This local development prototype is not HIPAA-ready and uses local test staff sessions, not production-ready authentication. Do not expose it publicly.</div>
 <section class="card"><h2>Submit a fictional inquiry</h2>
 <p>Use a made-up name such as “Demo Robin Orchard.” No email address, phone number, or clinical details are collected.</p>
 <form id="inquiry-form">
@@ -21,7 +21,7 @@ body{font:16px/1.5 system-ui,sans-serif;background:#f3f6f5;color:#173e38;margin:
 <button id="submit" type="submit">Save fictional inquiry</button>
 </form><p id="message" role="status" aria-live="polite"></p>
 </section>
-<section class="card"><h2>Saved fictional inquiries</h2><p>Saved in local SQLite. Refresh this page or restart the server to verify they remain.</p>
+<section class="card"><h2>Local staff access</h2><p>To view saved records, run <code>python -m app.staff</code> in your backend Terminal and use the administrator test key.</p><form id="staff-form"><label for="staff-key">Local staff access key</label><input id="staff-key" type="password" required autocomplete="off"><button type="submit">Open staff access</button></form><p id="staff-message" role="status"></p></section><section class="card"><h2>Saved fictional inquiries</h2><p>Saved in local SQLite. Refresh this page or restart the server to verify they remain.</p>
 <button id="refresh" type="button">Refresh inquiries</button><p id="list-message" role="status" aria-live="polite"></p>
 <div class="scroll"><table><thead><tr><th>Fictional client / ID</th><th>Interest</th><th>Contact preference</th><th>Status</th><th>Created</th></tr></thead><tbody id="inquiries"></tbody></table></div>
 </section><p><a href="/docs">API documentation</a> · <a href="/health">Health check</a></p>
@@ -45,5 +45,6 @@ form.addEventListener('submit',async event=>{
   try{await request('/api/inquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fictional_client_name:form.elements.fictional_client_name.value,category:form.elements.category.value,preferred_contact_method:form.elements.preferred_contact_method.value,fictional_data_only:document.querySelector('#fictional').checked})});form.reset();message.textContent='Saved to SQLite. Refresh the page to verify persistence.';await load();}
   catch(error){message.textContent='Could not save inquiry: '+error.message;}finally{submit.disabled=false;}
 });
+document.querySelector('#staff-form').addEventListener('submit',async event=>{event.preventDefault();try{await request('/api/staff/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:document.querySelector('#staff-key').value})});event.target.reset();document.querySelector('#staff-message').textContent='Local staff session opened.';load();}catch(error){document.querySelector('#staff-message').textContent=error.message;}});
 document.querySelector('#refresh').addEventListener('click',load);load();
 </script></body></html>

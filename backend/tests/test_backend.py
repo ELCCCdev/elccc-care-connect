@@ -4,8 +4,7 @@ import sqlite3
 import tempfile
 import unittest
 from uuid import UUID, uuid4
-from fastapi.testclient import TestClient
-from app.main import create_app
+from staff_fixtures import TestClient, create_app
 
 
 class BackendTests(unittest.TestCase):
@@ -94,7 +93,7 @@ class BackendTests(unittest.TestCase):
                 'Access-Control-Request-Headers': 'content-type'})
             self.assertEqual(preflight.status_code, 200)
             self.assertEqual(preflight.headers['access-control-allow-origin'], origin)
-            self.assertNotIn('access-control-allow-credentials', preflight.headers)
+            self.assertEqual(preflight.headers['access-control-allow-credentials'], 'true')
             saved = self.client.post('/api/inquiries', json=self.payload, headers={'Origin': origin})
             self.assertEqual(saved.status_code, 201)
             self.assertEqual(saved.headers['access-control-allow-origin'], origin)

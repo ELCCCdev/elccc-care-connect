@@ -4,8 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from uuid import uuid4
-from fastapi.testclient import TestClient
-from app.main import create_app
+from staff_fixtures import TestClient, create_app
 
 
 class PreferenceTests(unittest.TestCase):
@@ -74,6 +73,7 @@ class PreferenceTests(unittest.TestCase):
         before = self.client.get(path + '/management').json()
         record = self.client.post(path + '/convert', json={'confirmed': True}).json()
         self.assertEqual(record['preferences'], before['preferences'])
+        self.assertIsNone(record['assigned_counselor_id'])  # A preferred counselor is never an assignment.
         self.assertEqual(record['history'][:-1], before['history'])
         self.assertEqual(record['created_at'], inquiry['created_at'])
         self.assertEqual(self.client.post(path + '/convert', json={'confirmed': True}).status_code, 409)

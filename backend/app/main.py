@@ -11,11 +11,13 @@ import sqlite3
 from typing import Literal, Optional
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.staff import COOKIE, COUNSELORS, LOCAL_ORIGINS, StaffSessions, local_credentials
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 Category = Literal['individual', 'couples', 'family', 'general']
@@ -107,6 +109,15 @@ class ArchiveRequest(ConversionRequest):
     expected_revision: int = Field(ge=0)
 
 
+class StaffLogin(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    key: str = Field(min_length=1, max_length=256)
+
+
+class AssignmentRequest(ArchiveRequest):
+    counselor_id: Optional[str] = Field(..., max_length=80)
+
+
 class ManagedInquiry(Inquiry):
     converted_at: Optional[datetime] = None
     portal_status: PortalStatus = 'Not Sent'
@@ -115,8 +126,10 @@ class ManagedInquiry(Inquiry):
     original_inquiry: Inquiry
     revision: int = 0
     archived_at: Optional[datetime] = None
+    assigned_counselor_id: Optional[str] = None
+    assignment_updated_at: Optional[datetime] = None
 
-def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
+def create_app(db_path: Optional[Path] = None, *, seed: bool = True, staff_credentials: Optional[list] = None) -> FastAPI:
     """Factory allows tests to use disposable SQLite files."""
     database = Path(db_path) if db_path is not None else Path(
         os.environ.get('ELCCC_DB_PATH', str(BACKEND_DIR / 'data' / 'inquiries.sqlite3'))
@@ -140,8 +153,12 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
         )
         return record
 
+    sessions = None
+
     @asynccontextmanager
     async def lifespan(app):
+        nonlocal sessions
+        sessions = StaffSessions(staff_credentials if staff_credentials is not None else local_credentials())
         database.parent.mkdir(parents=True, exist_ok=True)
         with closing(connect()) as connection, connection:
             connection.execute('''CREATE TABLE IF NOT EXISTS inquiries (
@@ -173,6 +190,17 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
                 edits TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 0,
                 archived_at TEXT
             )""")
+            connection.execute("""CREATE TABLE IF NOT EXISTS counselors (
+                counselor_id TEXT PRIMARY KEY, name TEXT NOT NULL,
+                active INTEGER NOT NULL CHECK(active IN (0,1)),
+                accepting_assignments INTEGER NOT NULL CHECK(accepting_assignments IN (0,1))
+            )""")
+            connection.executemany('INSERT OR IGNORE INTO counselors VALUES (?, ?, 1, ?)', COUNSELORS)
+            connection.execute("""CREATE TABLE IF NOT EXISTS client_assignments (
+                inquiry_id TEXT PRIMARY KEY REFERENCES inquiries(inquiry_id),
+                counselor_id TEXT REFERENCES counselors(counselor_id), updated_at TEXT NOT NULL
+            )""")
+            connection.execute('CREATE INDEX IF NOT EXISTS assignment_counselor_idx ON client_assignments(counselor_id)')
             # Seed once per database, even when an existing database is later emptied.
             connection.execute('CREATE TABLE IF NOT EXISTS demo_metadata (key TEXT PRIMARY KEY)')
             if seed and connection.execute(
@@ -195,8 +223,58 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
         allow_origins=['http://127.0.0.1:5500', 'http://localhost:5500'],
         allow_methods=['GET', 'POST'],
         allow_headers=['Content-Type'],
-        allow_credentials=False,
+        allow_credentials=True,
     )
+
+    @app.middleware('http')
+    async def local_staff_boundary(request: Request, call_next):
+        # Browsers must not read staff responses through caches or foreign origins.
+        if request.method not in ('GET', 'HEAD', 'OPTIONS') and request.url.path.startswith('/api/'):
+            origin = request.headers.get('origin')
+            if origin is not None and origin not in LOCAL_ORIGINS:
+                return JSONResponse(status_code=403, content={'detail': 'This local development origin is not allowed.'})
+        response = await call_next(request)
+        if request.url.path.startswith('/api/'):
+            response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    def staff(request: Request):
+        principal = sessions.principal(request)
+        if principal['role'] == 'counselor':
+            with closing(connect()) as connection:
+                row = connection.execute('SELECT active FROM counselors WHERE counselor_id = ?',
+                                         (principal['counselor_id'],)).fetchone()
+            if row is None or not row['active']:
+                raise HTTPException(403, 'This counselor account is inactive.')
+        return principal
+
+    def administrator(principal=Depends(staff)):
+        if principal['role'] != 'administrator':
+            raise HTTPException(403, 'Administrator access is required.')
+        return principal
+
+    def readable_record(connection, inquiry_id, principal):
+        record = managed_record(connection, inquiry_id)
+        if principal['role'] != 'administrator' and (record['archived_at'] is not None or
+                record['converted_at'] is None or record['assigned_counselor_id'] != principal['counselor_id']):
+            raise HTTPException(404, 'Client profile not available to this staff account.')
+        return record
+
+    @app.post('/api/staff/login')
+    def staff_login(payload: StaffLogin, request: Request, response: Response):
+        token, principal = sessions.login(payload.key, request.client.host if request.client else 'local')
+        response.set_cookie(COOKIE, token, httponly=True, samesite='strict', max_age=8 * 60 * 60, path='/api')
+        return principal
+
+    @app.get('/api/staff/session')
+    def staff_session(principal=Depends(staff)):
+        return principal
+
+    @app.post('/api/staff/logout')
+    def staff_logout(request: Request, response: Response):
+        sessions.logout(request)
+        response.delete_cookie(COOKIE, path='/api', samesite='strict')
+        return {'status': 'signed out'}
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
@@ -235,15 +313,16 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
                           payload.category, payload.preferred_contact_method)
 
     @app.get('/api/inquiries', response_model=list[Inquiry])
-    def list_inquiries():
+    def list_inquiries(principal=Depends(administrator)):
         with closing(connect()) as connection:
             return [dict(row) for row in connection.execute(
                 'SELECT * FROM inquiries ORDER BY created_at DESC, inquiry_id DESC'
             )]
 
     @app.get('/api/inquiries/{inquiry_id}', response_model=Inquiry)
-    def get_inquiry(inquiry_id: UUID):
+    def get_inquiry(inquiry_id: UUID, principal=Depends(staff)):
         with closing(connect()) as connection:
+            readable_record(connection, inquiry_id, principal)
             record = connection.execute(
                 'SELECT * FROM inquiries WHERE inquiry_id = ?', (str(inquiry_id),)
             ).fetchone()
@@ -280,6 +359,9 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
         details = connection.execute('SELECT payload FROM preference_requests WHERE inquiry_id = ?', (str(inquiry_id),)).fetchone()
         if details:
             record['preferences'] = PreferenceDetails.model_validate_json(details['payload']).model_dump()
+        assignment = connection.execute('SELECT * FROM client_assignments WHERE inquiry_id = ?', (str(inquiry_id),)).fetchone()
+        record['assigned_counselor_id'] = assignment['counselor_id'] if assignment else None
+        record['assignment_updated_at'] = assignment['updated_at'] if assignment else None
         record['original_inquiry'] = dict(row)
         current = connection.execute('SELECT * FROM client_record_state WHERE inquiry_id = ?',
                                      (str(inquiry_id),)).fetchone()
@@ -310,17 +392,17 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
             return [managed_record(connection, row['inquiry_id']) for row in ids]
 
     @app.get('/api/prospective-clients', response_model=list[ManagedInquiry])
-    def prospective_clients(include_archived: bool = False):
+    def prospective_clients(include_archived: bool = False, principal=Depends(administrator)):
         return management_list(False, include_archived)
 
     @app.get('/api/clients', response_model=list[ManagedInquiry])
-    def established_clients(include_archived: bool = False):
+    def established_clients(include_archived: bool = False, principal=Depends(administrator)):
         return management_list(True, include_archived)
 
     @app.get('/api/inquiries/{inquiry_id}/management', response_model=ManagedInquiry)
-    def get_management(inquiry_id: UUID):
+    def get_management(inquiry_id: UUID, principal=Depends(staff)):
         with closing(connect()) as connection:
-            return managed_record(connection, inquiry_id)
+            return readable_record(connection, inquiry_id, principal)
 
     def require_active(record):
         if record['archived_at'] is not None:
@@ -336,7 +418,7 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
             'ON CONFLICT(inquiry_id) DO UPDATE SET revision = revision + 1', (str(inquiry_id),))
 
     @app.post('/api/inquiries/{inquiry_id}/edit', response_model=ManagedInquiry)
-    def edit_client(inquiry_id: UUID, payload: ClientEdit):
+    def edit_client(inquiry_id: UUID, payload: ClientEdit, principal=Depends(administrator)):
         with closing(connect()) as connection, connection:
             connection.execute('BEGIN IMMEDIATE')
             record = managed_record(connection, inquiry_id)
@@ -400,15 +482,15 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
             return managed_record(connection, inquiry_id)
 
     @app.post('/api/inquiries/{inquiry_id}/archive', response_model=ManagedInquiry)
-    def archive_client(inquiry_id: UUID, payload: ArchiveRequest):
+    def archive_client(inquiry_id: UUID, payload: ArchiveRequest, principal=Depends(administrator)):
         return set_archive(inquiry_id, payload, True)
 
     @app.post('/api/inquiries/{inquiry_id}/restore', response_model=ManagedInquiry)
-    def restore_client(inquiry_id: UUID, payload: ArchiveRequest):
+    def restore_client(inquiry_id: UUID, payload: ArchiveRequest, principal=Depends(administrator)):
         return set_archive(inquiry_id, payload, False)
 
     @app.post('/api/inquiries/{inquiry_id}/convert', response_model=ManagedInquiry)
-    def convert_to_client(inquiry_id: UUID, payload: ConversionRequest):
+    def convert_to_client(inquiry_id: UUID, payload: ConversionRequest, principal=Depends(administrator)):
         with closing(connect()) as connection, connection:
             # Serialize state transitions, including competing requests from other tabs.
             connection.execute('BEGIN IMMEDIATE')
@@ -428,7 +510,7 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
             return managed_record(connection, inquiry_id)
 
     @app.post('/api/inquiries/{inquiry_id}/portal-status', response_model=ManagedInquiry)
-    def update_portal_status(inquiry_id: UUID, payload: PortalStatusUpdate):
+    def update_portal_status(inquiry_id: UUID, payload: PortalStatusUpdate, principal=Depends(administrator)):
         with closing(connect()) as connection, connection:
             connection.execute('BEGIN IMMEDIATE')
             record = managed_record(connection, inquiry_id)
@@ -444,6 +526,55 @@ def create_app(db_path: Optional[Path] = None, *, seed: bool = True) -> FastAPI:
                                     record['portal_status'] + ' → ' + payload.portal_status + '; tracking only, no invitation sent.'))
                 advance_revision(connection, inquiry_id)
             return managed_record(connection, inquiry_id)
+
+    @app.get('/api/counselors')
+    def counselor_directory(principal=Depends(staff)):
+        with closing(connect()) as connection:
+            return [dict(row) for row in connection.execute('SELECT * FROM counselors ORDER BY name')]
+
+    @app.post('/api/inquiries/{inquiry_id}/assignment', response_model=ManagedInquiry)
+    def assign_counselor(inquiry_id: UUID, payload: AssignmentRequest, principal=Depends(administrator)):
+        with closing(connect()) as connection, connection:
+            connection.execute('BEGIN IMMEDIATE')
+            record = managed_record(connection, inquiry_id)
+            require_active(record)
+            check_revision(record, payload.expected_revision)
+            if record['converted_at'] is None:
+                raise HTTPException(409, 'Convert this inquiry to an established client before assigning a counselor.')
+            counselor = None
+            if payload.counselor_id is not None:
+                counselor = connection.execute('SELECT * FROM counselors WHERE counselor_id = ?', (payload.counselor_id,)).fetchone()
+                if counselor is None or not counselor['active'] or not counselor['accepting_assignments']:
+                    raise HTTPException(422, 'Choose an active counselor who is accepting assignments.')
+            if record['assigned_counselor_id'] == payload.counselor_id:
+                return record
+            old = connection.execute('SELECT name FROM counselors WHERE counselor_id = ?', (record['assigned_counselor_id'],)).fetchone()
+            timestamp = datetime.now(timezone.utc).isoformat()
+            connection.execute('INSERT INTO client_assignments VALUES (?, ?, ?) '
+                               'ON CONFLICT(inquiry_id) DO UPDATE SET counselor_id = excluded.counselor_id, updated_at = excluded.updated_at',
+                               (str(inquiry_id), payload.counselor_id, timestamp))
+            advance_revision(connection, inquiry_id)
+            connection.execute('INSERT INTO inquiry_history (inquiry_id, action, occurred_at, detail) VALUES (?, ?, ?, ?)',
+                               (str(inquiry_id), 'Counselor assignment updated', timestamp,
+                                'Local administrator: ' + (old['name'] if old else 'Not assigned') + ' to ' +
+                                (counselor['name'] if counselor else 'Not assigned') + '. Preference remains separate.'))
+            return managed_record(connection, inquiry_id)
+
+    @app.get('/api/counselors/{counselor_id}/clients')
+    def counselor_clients(counselor_id: str, principal=Depends(staff)):
+        if principal['role'] != 'administrator' and principal['counselor_id'] != counselor_id:
+            raise HTTPException(403, 'Only your own caseload is available.')
+        with closing(connect()) as connection:
+            counselor = connection.execute('SELECT * FROM counselors WHERE counselor_id = ?', (counselor_id,)).fetchone()
+            if counselor is None:
+                raise HTTPException(404, 'Counselor not found.')
+            ids = connection.execute('SELECT a.inquiry_id FROM client_assignments a '
+                'JOIN inquiry_management m USING(inquiry_id) LEFT JOIN client_record_state s USING(inquiry_id) '
+                'WHERE a.counselor_id = ? AND m.converted_at IS NOT NULL AND s.archived_at IS NULL '
+                'ORDER BY a.inquiry_id', (counselor_id,)).fetchall()
+            records = [ManagedInquiry(**managed_record(connection, row['inquiry_id'])).model_dump(mode='json') for row in ids]
+            records.sort(key=lambda r: (r['fictional_client_name'].casefold(), str(r['inquiry_id'])))
+            return {'counselor': dict(counselor), 'active_count': len(records), 'clients': records}
 
     return app
 

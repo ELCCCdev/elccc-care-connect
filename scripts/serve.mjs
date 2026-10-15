@@ -1,16 +1,13 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
 const port = Number(process.env.PORT || 4173);
-const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 createServer(async (req, res) => {
-  try {
-    const path = normalize(req.url === "/" ? "/index.html" : req.url.split("?")[0]);
-    const file = join(process.cwd(), path);
-    const body = await readFile(file);
-    res.writeHead(200, { "content-type": types[extname(file)] || "text/plain" });
-    res.end(body);
-  } catch {
-    res.writeHead(404); res.end("Not found");
+  if (!["/", "/index.html"].includes(new URL(req.url, "http://localhost").pathname)) {
+    res.writeHead(404); res.end("Not found"); return;
   }
-}).listen(port, "0.0.0.0", () => console.log(`Serving on http://0.0.0.0:${port}`));
+  try {
+    const body = await readFile("index.html");
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(body);
+  } catch { res.writeHead(404); res.end("Not found"); }
+}).listen(port, "127.0.0.1", () => console.log(`Serving on http://127.0.0.1:${port}`));

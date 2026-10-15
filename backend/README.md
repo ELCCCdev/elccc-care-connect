@@ -1,7 +1,13 @@
 # ELCCC Care Connect — Phase 1 local backend
 
+**Current branch:** `codex/elccc-counselor-profile-pages`. Saved record reads now require
+local staff access. Run `python -m app.staff` to display your generated test keys; the
+frontend signs in using an HttpOnly cookie. Use the [current Mac walkthrough](../docs/COUNSELOR_PROFILE_PAGES.md)
+and the restricted frontend server, not the older whole-repository preview command.
+
+
 **DEVELOPMENT PROTOTYPE — FICTIONAL DATA ONLY.** This is not HIPAA-ready or suitable
-for real patient information. It has no authentication or authorization. Never
+for real patient information. It uses local test staff sessions and server-side role/record checks, not production-ready authentication. Never
 enter real names, contact details, clinical information, or patient records. Do
 not expose it publicly or connect the GitHub Pages frontend to it.
 
@@ -211,3 +217,24 @@ conversion/invitation changes advance the revision. Stale writes return 409;
 archived clients must be restored before editing/conversion/invitation updates.
 All actual changes append history in the same transaction. No data reset or new
 dependency is required. See [local review instructions](../docs/CLIENT_RECORD_ACTIONS.md).
+
+### Persistent counselor assignment and scoped profiles
+
+Additive `counselors` and `client_assignments` tables store eligibility and the current
+assignment. POST `/api/inquiries/{id}/assignment` requires an administrator session,
+`confirmed: true`, `expected_revision`, and explicit `counselor_id` (or null to remove).
+Only active established clients and active counselors accepting assignments are allowed.
+Updates and timestamped history are atomic; counselor preferences are never assignments.
+Management responses add `assigned_counselor_id` and `assignment_updated_at`.
+
+GET `/api/counselors/{id}/clients` returns scoped clients and counts; counselors can
+read only their own active established caseload. Broad client/inquiry lists and all
+management mutations require administrator access; single-record reads also support
+the assigned counselor. Public synthetic creation endpoints remain available.
+
+Local staff login/session/logout routes live under `/api/staff`. Generated credentials
+are private local files outside the frontend root; never commit or share them. Sessions
+expire after eight hours and are invalidated by restart. These shared local test roles
+are not real staff identities or production authentication. The current walkthrough
+covers credentials, HttpOnly cookies, CORS, revision conflicts, future authorization,
+production readiness and regression commands. Dependencies remain unchanged.

@@ -11,6 +11,7 @@ import tempfile
 import time
 import urllib.request
 from playwright.sync_api import sync_playwright
+from browser_support import configure_staff, staff_login, legacy_profile_components
 
 ROOT = Path(__file__).resolve().parent.parent
 processes = []
@@ -34,9 +35,10 @@ with tempfile.TemporaryDirectory() as temp:
     env = dict(os.environ, ELCCC_DB_PATH=str(Path(temp) / 'test.sqlite3'))
     backend_args = [os.environ.get('BACKEND_PYTHON', sys.executable), '-m', 'uvicorn', 'app.main:app',
                     '--host', '127.0.0.1', '--port', '8000']
+    configure_staff(env, temp)
     try:
         backend = start(backend_args, ROOT / 'backend', env, 'http://127.0.0.1:8000/health')
-        start([sys.executable, '-m', 'http.server', '5500', '--bind', '127.0.0.1'], ROOT, env,
+        start([sys.executable, 'scripts/serve-local.py', '--port', '5500'], ROOT, env,
               'http://127.0.0.1:5500')
         with sync_playwright() as p:
             executable = os.environ.get('CHROMIUM_PATH')
@@ -45,6 +47,8 @@ with tempfile.TemporaryDirectory() as temp:
             browser = p.chromium.launch(executable_path=executable,
                                         args=['--no-sandbox'])
             page = browser.new_page()
+            legacy_profile_components(page)
+            staff_login(page)
             page.set_default_timeout(10000)
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
@@ -123,6 +127,7 @@ with tempfile.TemporaryDirectory() as temp:
             backend.terminate()
             backend.wait(timeout=10)
             backend = start(backend_args, ROOT / 'backend', env, 'http://127.0.0.1:8000/health')
+            staff_login(page)
             page.reload()
             page.evaluate("selectDemoRole('Admin');state.activeAdminPanel='established';render()")
             page.get_by_label('Search clients', exact=True).fill(inquiry_id)
