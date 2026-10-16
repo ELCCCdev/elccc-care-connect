@@ -1,5 +1,10 @@
 # ELCCC Care Connect
 
+Current review: **Intake, staff navigation, and selected-client actions** on
+`codex/elccc-intake-navigation-review`. See the [simple Mac setup, review checklist,
+recovery findings, and validation commands](docs/LOCAL_REVIEW.md).
+
+
 ## Current phase: dedicated profiles and counselor assignments
 
 Use branch `codex/elccc-counselor-profile-pages`. Client names, row double-click,

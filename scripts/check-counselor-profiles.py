@@ -76,6 +76,40 @@ with tempfile.TemporaryDirectory() as temp:
             row = directory.locator('[data-managed-record="' + inquiry_id + '"]')
             row.wait_for()
             original_url = directory.url
+            # Intake is a first-class work area, immediately after Overview.
+            navigation = directory.get_by_role('navigation', name='Admin work areas')
+            assert navigation.locator('button').all_text_contents()[:2] == ['Overview', 'Intake']
+            navigation.get_by_role('button', name='Overview', exact=True).click()
+            directory.get_by_role('button', name='Review Intake', exact=True).click()
+            directory.get_by_role('heading', name='Intake', exact=True).wait_for()
+            directory.get_by_role('button', name='Review Intake for Test Alex River', exact=True).wait_for()
+            directory.get_by_role('button', name='Clients', exact=True).click()
+            row.wait_for()
+            toolbar = directory.get_by_role('group', name='Selected client actions')
+            assert toolbar.get_by_role('button', name='View', exact=True).is_disabled()
+            row.focus(); directory.keyboard.press('Space')
+            assert 'Test Alex River' in toolbar.inner_text()
+            assert row.get_attribute('data-selected') == 'true'
+            with context.expect_page() as selected_popup:
+                toolbar.get_by_role('button', name='View', exact=True).focus()
+                directory.keyboard.press('Enter')
+            selected_popup.value.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
+            selected_popup.value.close()
+            toolbar.get_by_role('button', name='Edit', exact=True).click()
+            directory.get_by_role('heading', name='Edit client details', exact=True).wait_for()
+            directory.keyboard.press('Escape')
+            toolbar.get_by_role('button', name='Archive', exact=True).click()
+            directory.get_by_role('heading', name='Archive client record', exact=True).wait_for()
+            directory.keyboard.press('Escape')
+            assert directory.request.get(api + '/management').json()['archived_at'] is None
+            for width in [320, 375, 768, 1280]:
+                directory.set_viewport_size(dict(width=width, height=900))
+                assert directory.locator('header').get_by_role('button', name='Sign Out', exact=True).is_visible()
+                assert 'Administrator' in directory.locator('.staff-navigation').inner_text()
+                assert not directory.evaluate('document.documentElement.scrollWidth > innerWidth + 1'), width
+                if os.environ.get('QA_SCREENSHOTS') and width in [375, 1280]:
+                    directory.screenshot(path=str(ROOT / 'work' / ('client-directory-' + str(width) + '.png')), full_page=True)
+            directory.set_viewport_size(dict(width=1280, height=900))
 
             def open_profile(action):
                 page_count = len(context.pages)
@@ -188,7 +222,7 @@ with tempfile.TemporaryDirectory() as temp:
                 assert profile.locator('#profile-activity').is_visible()
             if os.environ.get('QA_SCREENSHOTS'):
                 profile.screenshot(path=str(ROOT / 'work' / 'dedicated-client-profile.png'), full_page=True)
-            profile.get_by_role('button', name='Delete', exact=True).click()
+            profile.get_by_role('button', name='Archive', exact=True).click()
             profile.get_by_label('I confirm I want to archive this client record.').check()
             profile.get_by_role('button', name='Confirm Archive', exact=True).click()
             profile.locator('.archive-banner').wait_for()
@@ -216,6 +250,14 @@ with tempfile.TemporaryDirectory() as temp:
             profile.get_by_role('heading', name='Established Clients', exact=True).wait_for()
             assert directory.url == original_url
             profile.get_by_label('Search clients', exact=True).fill(inquiry_id)
+            profile.locator('[data-select-client]').check()
+            established_toolbar = profile.get_by_role('group', name='Selected client actions')
+            for action in ['View', 'Edit', 'Archive']:
+                assert established_toolbar.get_by_role('button', name=action, exact=True).is_enabled()
+            # Filtering away the selected row clears the toolbar rather than targeting a hidden record.
+            profile.get_by_label('Search clients', exact=True).fill('no matching synthetic client')
+            assert established_toolbar.get_by_role('button', name='View', exact=True).is_disabled()
+            profile.get_by_label('Search clients', exact=True).fill(inquiry_id)
             with context.expect_page() as popup:
                 profile.locator('[data-managed-record]').get_by_role('button', name='View', exact=True).click()
             established_tab = popup.value
@@ -223,13 +265,22 @@ with tempfile.TemporaryDirectory() as temp:
             assert '?workspace=clients' in profile.url
             # Shared-cookie sign-out clears another profile on focus instead of revealing cached details.
             profile.bring_to_front()
-            profile.get_by_role('button', name='Sign out of staff access', exact=True).first.click()
+            # A failed logout remains visible and keeps the active session.
+            profile.route('**/api/staff/logout', lambda route: route.fulfill(status=503, content_type='application/json', body='{"detail":"Synthetic logout outage"}'))
+            profile.get_by_role('button', name='Sign Out', exact=True).click()
+            profile.get_by_role('alert').filter(has_text='Could not sign out').wait_for()
+            assert 'Administrator' in profile.locator('.staff-navigation').inner_text()
+            profile.unroute('**/api/staff/logout')
+            profile.get_by_role('button', name='Sign Out', exact=True).click()
+            profile.get_by_role('button', name="I'm an Administrator", exact=True).wait_for()
+            assert '?client=' not in profile.url
+            assert profile.request.get(api + '/management').status == 401
             established_tab.bring_to_front()
             established_tab.get_by_label('Local staff access key').wait_for()
             assert 'Test Alex River' not in established_tab.locator('main').inner_text()
             assert not errors, errors
             browser.close()
-            print('PASS: protected stable profile URLs, single/double-click and keyboard new-tab entry paths, original directory preserved, six sections, edit/cancel/save/archive/restore, preferred versus assigned counselor, confirmed assignment/change/removal, scoped counselor caseload and read-only profiles, blocked anonymous access/files, four responsive widths, refresh and actual restart with reauthentication.')
+            print('PASS: protected stable profile URLs, single/double-click and keyboard new-tab entry paths, original directory preserved, six sections, edit/cancel/save/archive/restore, preferred versus assigned counselor, confirmed assignment/change/removal, scoped counselor caseload and read-only profiles, blocked anonymous access/files, Intake navigation, selected toolbars in both lists, keyboard selection and new-tab View, canceled Edit/Archive, filter isolation, header at four widths, failed/successful logout, refresh and actual restart with reauthentication.')
     finally:
         for process in reversed(processes):
             if process.poll() is None:

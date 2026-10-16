@@ -93,7 +93,7 @@ with tempfile.TemporaryDirectory() as temp:
             panel.get_by_text('4 saved inquiries.', exact=True).wait_for()
             assert 'Jordan Demo' in panel.inner_text()
             inquiry_id = page.evaluate('state.lastSavedInquiryId')
-            assert page.locator('[aria-label="Admin work areas"] button').all_text_contents() == ['Overview','Clients','Appointments','Care Journey','Reports']
+            assert page.locator('[aria-label="Admin work areas"] button').all_text_contents() == ['Overview','Intake','Clients','Appointments','Care Journey','Reports']
             assert page.locator('[data-admin-panel=settings]').count() == 0
             # Phase 3: independent invitation tracking, confirmed conversion, and history.
             page.get_by_role('button', name='Clients', exact=True).click()

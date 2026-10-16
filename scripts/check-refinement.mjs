@@ -9,8 +9,8 @@ vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
 const run=code=>vm.runInContext(code,context);
 run("selectDemoRole('Admin')");
 let nav=run('adminNavigation()');
-assert.equal((nav.match(/<button/g)||[]).length,6); // Five primary areas, one Overview shortcut.
-for(const label of ['Overview','Clients','Appointments','Care Journey','Reports'])assert.ok(nav.includes('>'+label+'</button>'));
+assert.equal((nav.match(/<button/g)||[]).length,7); // Six primary areas, one Overview shortcut.
+for(const label of ['Overview','Intake','Clients','Appointments','Care Journey','Reports'])assert.ok(nav.includes('>'+label+'</button>'));
 assert.doesNotMatch(nav,/Approval Settings|data-admin-panel="settings"/);
 run("state.activeAdminPanel='prospective'");nav=run('adminNavigation()');
 for(const label of ['Prospective Clients','Established Clients'])assert.ok(nav.includes('>'+label+'</button>'));
@@ -26,4 +26,4 @@ for(const role of ['Client','Counselor','Admin']){
  assert.match(root.innerHTML,/MYIO are not connected/);
  assert.match(root.innerHTML,/not authentication or authorization/);
 }
-console.log('PASS: five primary Admin areas, grouped client sections, hidden Approval Settings with retained implementation, and shared notices across roles.');
+console.log('PASS: six primary Admin areas, grouped client sections, hidden Approval Settings with retained implementation, and shared notices across roles.');

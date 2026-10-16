@@ -33,7 +33,7 @@ try {
  assert.match(await page.locator('main').innerText(),/Contacted/);
  for(const width of [320,375,768,1024,1440,1920]){
   await page.setViewportSize({width,height:900});
-  for(const area of ['overview','appointments','pipeline','prayer','clients','reports']){
+  for(const area of ['overview','intake','appointments','pipeline','prayer','clients','reports']){
    if(area==='clients')await role('Clients').click();
    if(area==='prayer')await page.locator('[data-admin-panel=overview]').click();
    await page.locator(`[data-admin-panel=${area}]`).first().click();
