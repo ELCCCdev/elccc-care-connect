@@ -12,7 +12,7 @@ import tempfile
 import time
 import urllib.request
 from playwright.sync_api import sync_playwright
-from browser_support import configure_staff, staff_login, legacy_profile_components
+from browser_support import open_selected_profile, configure_staff, staff_login, legacy_profile_components
 
 ROOT = Path(__file__).resolve().parent.parent
 processes = []
@@ -119,7 +119,7 @@ with tempfile.TemporaryDirectory() as temp:
             assert page.get_by_label('Sort clients', exact=True).input_value() == 'recent'
             records = page.request.get('http://127.0.0.1:8000/api/prospective-clients').json()
             expected = sorted(records, key=lambda r: (-int(datetime.fromisoformat(max(e['occurred_at'] for e in r['history']).replace('Z', '+00:00')).timestamp() * 1000), r['inquiry_id']))
-            actual = page.locator('[data-management-open]').evaluate_all('els => els.map(el => el.dataset.managementOpen)')
+            actual = page.locator('[data-managed-record]').evaluate_all('els => els.map(el => el.dataset.managedRecord)')
             assert actual == [r['inquiry_id'] for r in expected]
             activity_header = page.get_by_role('button', name='Last Activity', exact=True)
             activity_header.focus()
@@ -139,9 +139,10 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_label('Client status', exact=True).select_option('prospective')
             page.get_by_role('button', name='Clear filters', exact=True).click()
 
-            page.locator('[data-management-open="' + inquiry_id + '"]').click()
+            open_selected_profile(page, inquiry_id)
             profile = page.locator('[data-managed-profile]')
             profile.get_by_text('Not converted to client.', exact=True).wait_for()
+            profile.get_by_text('Planned services', exact=True).first.click()
             profile.locator('[data-onboarding-step="questionnaire"]').get_by_text('Not available', exact=True).wait_for()
             profile.get_by_role('button', name='Open intake checklist', exact=True).click()
             page.get_by_label('Preferred session time', exact=True).select_option('Evening')
@@ -150,7 +151,7 @@ with tempfile.TemporaryDirectory() as temp:
             open_admin()
             page.get_by_role('button', name='Clients', exact=True).click()
             page.get_by_role('button', name='Prospective Clients', exact=True).click()
-            page.locator('[data-management-open="' + inquiry_id + '"]').click()
+            open_selected_profile(page, inquiry_id)
             profile.locator('[data-onboarding-step="intake"]').get_by_text('Submitted', exact=True).wait_for()
 
             profile.get_by_label('Portal invitation status').select_option('Sent')
@@ -172,14 +173,14 @@ with tempfile.TemporaryDirectory() as temp:
             profile.get_by_role('button', name='Save invitation tracking').click()
             page.get_by_text('Invitation tracking saved locally.', exact=False).wait_for()
             page.get_by_role('button', name='Prospective Clients', exact=True).click()
-            assert page.locator('[data-management-open="' + inquiry_id + '"]').count() == 0
+            assert page.locator('[data-managed-record="' + inquiry_id + '"]').count() == 0
             staff_login(page)
             page.reload()
             open_admin()
             page.get_by_role('button', name='Clients', exact=True).click()
             page.get_by_role('button', name='Established Clients', exact=True).click()
             page.get_by_text('1 established clients.', exact=True).wait_for()
-            page.locator('[data-management-open="' + inquiry_id + '"]').click()
+            open_selected_profile(page, inquiry_id)
             profile.get_by_role('heading', name='Jordan Demo profile').wait_for()
             assert profile.get_by_label('Portal invitation status').input_value() == 'Activated'
             stop(backend)

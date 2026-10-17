@@ -87,6 +87,34 @@ with tempfile.TemporaryDirectory() as temp:
             row.wait_for()
             toolbar = directory.get_by_role('group', name='Selected client actions')
             assert toolbar.get_by_role('button', name='View', exact=True).is_disabled()
+            # Switching records and lists never leaves a hidden record active.
+            other = directory.request.post('http://127.0.0.1:8000/api/inquiries', data={
+                'fictional_client_name': 'Test Bailey River', 'category': 'individual',
+                'preferred_contact_method': 'email', 'fictional_data_only': True})
+            assert other.status == 201
+            other_id = other.json()['inquiry_id']
+            directory.get_by_role('button', name='Refresh client lists', exact=True).click()
+            directory.get_by_label('Search clients', exact=True).fill('Test ')
+            other_row = directory.locator('[data-managed-record="' + other_id + '"]')
+            row.locator('h3').click()
+            other_row.locator('h3').click()
+            assert other_row.get_attribute('data-selected') == 'true'
+            assert row.get_attribute('data-selected') == 'false'
+            assert 'Test Bailey River' in toolbar.inner_text()
+            directory.get_by_role('button', name='Established Clients', exact=True).click()
+            directory.get_by_role('button', name='Prospective Clients', exact=True).click()
+            assert toolbar.get_by_role('button', name='View', exact=True).is_disabled()
+            directory.get_by_label('Search clients', exact=True).fill(inquiry_id)
+            assert row.locator('button').count() == 0
+            row.locator('h3').click()
+            assert row.get_attribute('data-selected') == 'true'
+            row.locator('h3').click()
+            assert row.get_attribute('data-selected') == 'false'
+            assert all(not button.is_enabled() for button in toolbar.get_by_role('button').all())
+            row.locator('[data-select-client]').check()
+            directory.get_by_label('Search clients', exact=True).fill('Test Alex')
+            assert toolbar.get_by_role('button', name='View', exact=True).is_disabled()
+            directory.get_by_label('Search clients', exact=True).fill(inquiry_id)
             row.focus(); directory.keyboard.press('Space')
             assert 'Test Alex River' in toolbar.inner_text()
             assert row.get_attribute('data-selected') == 'true'
@@ -114,16 +142,14 @@ with tempfile.TemporaryDirectory() as temp:
             def open_profile(action):
                 page_count = len(context.pages)
                 with context.expect_page() as popup:
+                    row.locator('[data-select-client]').uncheck()
                     if action == 'name':
-                        row.locator('[data-client-name]').click()
-                    elif action == 'double-name':
-                        row.locator('[data-client-name]').dblclick()
-                    elif action == 'double':
-                        row.locator('[role=cell]').nth(2).dblclick()
+                        row.locator('h3').click()
                     elif action == 'keyboard':
-                        row.locator('[data-client-name]').focus(); directory.keyboard.press('Enter')
+                        row.focus(); directory.keyboard.press('Enter')
                     else:
-                        row.get_by_role('button', name=action, exact=True).click()
+                        row.locator('[data-select-client]').check()
+                    toolbar.get_by_role('button', name='View', exact=True).click()
                 page = popup.value
                 page.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
                 assert page.url == 'http://127.0.0.1:5500/?client=' + inquiry_id
@@ -133,20 +159,37 @@ with tempfile.TemporaryDirectory() as temp:
                 assert directory.locator('[data-managed-profile]').count() == 0
                 return page
 
-            for action in ['name', 'double-name', 'double', 'keyboard', 'View']:
+            for action in ['name', 'keyboard', 'View']:
                 page = open_profile(action)
                 page.close(); directory.bring_to_front(); row.wait_for()
-            profile = open_profile('Open profile')
+            profile = open_profile('View')
             for title in ['Overview', 'Contact Information', 'Counseling Preferences', 'Intake', 'Appointments', 'Activity History']:
                 profile.get_by_role('navigation', name='Client profile sections').get_by_role('link', name=title, exact=True).wait_for()
             assert profile.locator('[data-assignment-form]').count() == 0
             assert 'Convert this inquiry' in profile.locator('[data-counselor-assignment]').inner_text()
+            sections = profile.get_by_role('navigation', name='Client profile sections')
+            assert sections.get_by_role('link').all_text_contents()[:2] == ['Overview', 'Intake']
+            assert profile.locator('#saved-onboarding-progress').get_attribute('value') == '1'
+            sections.get_by_role('link', name='Intake', exact=True).click()
+            profile.wait_for_function("document.querySelector('#profile-intake').getBoundingClientRect().top < 60")
+            assert profile.locator('#profile-intake [data-onboarding-checklist]').is_visible()
+            assert profile.locator('#profile-intake').evaluate('el => el.previousElementSibling.id') == 'profile-overview'
+            profile.get_by_role('button', name='Convert to Client', exact=True).click()
+            profile.get_by_role('group', name='Confirm client conversion').get_by_text('This moves the record', exact=False).wait_for()
+            profile.get_by_role('button', name='Cancel Conversion', exact=True).click()
+            assert profile.request.get(api + '/management').json()['converted_at'] is None
             profile.get_by_role('button', name='Convert to Client', exact=True).click()
             profile.get_by_role('button', name='Confirm Conversion', exact=True).click()
             profile.locator('[data-assignment-form]').wait_for()
             assert profile.get_by_label('Assign counselor', exact=True).input_value() == ''
             assert 'Requested preference: Rachel Kim' in profile.locator('[data-counselor-assignment]').inner_text()
             # Confirmation and Cancel work independently of preferred counselor.
+            assert profile.get_by_role('button', name='Convert to Client', exact=True).count() == 0
+            assert profile.locator('#saved-onboarding-progress').get_attribute('value') == '2'
+            converted = profile.request.get(api + '/management').json()
+            assert len([e for e in converted['history'] if e['action'] == 'Converted to client']) == 1
+            assert profile.request.post(api + '/convert', data={'confirmed': True}).status == 409
+            assert profile.request.get(api + '/management').json() == converted
             profile.get_by_label('Assign counselor', exact=True).select_option('rachel-kim')
             profile.get_by_role('button', name='Review Assignment Change', exact=True).click()
             directory.bring_to_front(); profile.bring_to_front()
@@ -158,6 +201,25 @@ with tempfile.TemporaryDirectory() as temp:
             profile.get_by_role('button', name='Review Assignment Change', exact=True).click()
             profile.get_by_role('button', name='Confirm Assignment Change', exact=True).click()
             profile.get_by_text('Counselor assignment saved.', exact=True).wait_for()
+            assert profile.locator('#saved-onboarding-progress').get_attribute('value') == '3'
+            profile.get_by_label('Portal invitation status', exact=True).select_option('Sent')
+            profile.get_by_role('button', name='Save invitation tracking', exact=True).click()
+            profile.get_by_text('Invitation tracking saved locally.', exact=False).wait_for()
+            assert profile.locator('#saved-onboarding-progress').get_attribute('value') == '4'
+            profile.reload()
+            profile.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
+            assert profile.locator('#saved-onboarding-progress').get_attribute('value') == '4'
+            if os.environ.get('QA_SCREENSHOTS'):
+                profile.set_viewport_size(dict(width=375, height=900))
+                profile.get_by_role('link', name='Intake', exact=True).click()
+                profile.wait_for_function("document.querySelector('#profile-intake').getBoundingClientRect().top < 60")
+                profile.screenshot(path=str(ROOT / 'work' / 'intake-checklist-mobile.png'))
+                profile.set_viewport_size(dict(width=1280, height=900))
+            profile.get_by_label('Portal invitation status', exact=True).select_option('Not Sent')
+            profile.get_by_role('button', name='Save invitation tracking', exact=True).click()
+            profile.get_by_text('Invitation tracking saved locally.', exact=False).wait_for()
+            assert profile.locator('#saved-onboarding-progress').get_attribute('value') == '3'
+
             assert 'Rachel Kim' in profile.locator('.profile-heading').inner_text()
             profile.reload()
             profile.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
@@ -259,7 +321,8 @@ with tempfile.TemporaryDirectory() as temp:
             assert established_toolbar.get_by_role('button', name='View', exact=True).is_disabled()
             profile.get_by_label('Search clients', exact=True).fill(inquiry_id)
             with context.expect_page() as popup:
-                profile.locator('[data-managed-record]').get_by_role('button', name='View', exact=True).click()
+                profile.locator('[data-select-client]').check()
+                established_toolbar.get_by_role('button', name='View', exact=True).click()
             established_tab = popup.value
             established_tab.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
             assert '?workspace=clients' in profile.url
@@ -280,7 +343,7 @@ with tempfile.TemporaryDirectory() as temp:
             assert 'Test Alex River' not in established_tab.locator('main').inner_text()
             assert not errors, errors
             browser.close()
-            print('PASS: protected stable profile URLs, single/double-click and keyboard new-tab entry paths, original directory preserved, six sections, edit/cancel/save/archive/restore, preferred versus assigned counselor, confirmed assignment/change/removal, scoped counselor caseload and read-only profiles, blocked anonymous access/files, Intake navigation, selected toolbars in both lists, keyboard selection and new-tab View, canceled Edit/Archive, filter isolation, header at four widths, failed/successful logout, refresh and actual restart with reauthentication.')
+            print('PASS: protected stable profile URLs, toolbar-only new-tab profiles, row click and keyboard selection/deselection, original directory preserved, six sections, edit/cancel/save/archive/restore, preferred versus assigned counselor, confirmed assignment/change/removal, scoped counselor caseload and read-only profiles, blocked anonymous access/files, Intake navigation, selected toolbars in both lists, keyboard selection and new-tab View, canceled Edit/Archive, filter isolation, header at four widths, failed/successful logout, refresh and actual restart with reauthentication.')
     finally:
         for process in reversed(processes):
             if process.poll() is None:

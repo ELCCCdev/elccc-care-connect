@@ -11,7 +11,7 @@ import tempfile
 import time
 import urllib.request
 from playwright.sync_api import sync_playwright
-from browser_support import configure_staff, staff_login, legacy_profile_components
+from browser_support import open_selected_profile, configure_staff, staff_login, legacy_profile_components
 
 ROOT = Path(__file__).resolve().parent.parent
 processes = []
@@ -111,7 +111,7 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='Return to services', exact=True).click()
             page.evaluate("selectDemoRole('Admin');state.activeAdminPanel='prospective';render()")
             page.get_by_label('Search clients', exact=True).fill(inquiry_id)
-            page.locator('[data-management-open]').click()
+            open_selected_profile(page)
             profile = page.locator('[data-managed-profile]')
             profile.get_by_text('alex@example.com', exact=False).wait_for()
             assert '2099-01-01' in profile.inner_text()
@@ -131,7 +131,7 @@ with tempfile.TemporaryDirectory() as temp:
             page.reload()
             page.evaluate("selectDemoRole('Admin');state.activeAdminPanel='established';render()")
             page.get_by_label('Search clients', exact=True).fill(inquiry_id)
-            page.locator('[data-management-open]').click()
+            open_selected_profile(page)
             profile.get_by_text('alex@example.com', exact=False).wait_for()
             assert 'Converted to client' in profile.inner_text()
             assert page.get_by_label('Portal invitation status').input_value() == 'Sent'

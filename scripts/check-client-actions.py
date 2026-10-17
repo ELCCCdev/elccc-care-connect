@@ -11,7 +11,7 @@ import tempfile
 import time
 import urllib.request
 from playwright.sync_api import sync_playwright
-from browser_support import configure_staff, staff_login, legacy_profile_components
+from browser_support import open_selected_profile, configure_staff, staff_login, legacy_profile_components
 
 ROOT = Path(__file__).resolve().parent.parent
 processes = []
@@ -73,26 +73,26 @@ with tempfile.TemporaryDirectory() as temp:
                 assert inquiry_id in profile.inner_text()
 
             def open_dialog(action):
-                row.locator('[data-client-action=' + action + ']').click()
+                row.locator('[data-select-client]').check()
+                page.get_by_role('group', name='Selected client actions').locator('[data-client-action=' + action + ']').click()
                 page.locator('.client-record-dialog h2').wait_for()
 
             def read_record():
                 return page.request.get(api + '/management').json()
 
-            # Single-click name, double-click name or row, keyboard, View and Open profile.
-            row.locator('[data-client-name]').click()
-            assert_profile('Test Alex River'); close_profile()
-            row.locator('[data-client-name]').dblclick()
-            assert_profile('Test Alex River'); close_profile()
-            row.locator('[role=cell]').nth(2).dblclick()
-            assert_profile('Test Alex River'); close_profile()
-            row.focus(); page.keyboard.press('Enter')
-            assert_profile('Test Alex River'); close_profile()
-            row.locator('[data-client-name]').focus(); page.keyboard.press('Enter')
-            assert_profile('Test Alex River'); close_profile()
-            row.get_by_role('button', name='View', exact=True).click()
-            assert_profile('Test Alex River'); close_profile()
-            row.get_by_role('button', name='Open profile', exact=True).click()
+            # Row controls only select; all record actions live in one toolbar.
+            assert row.locator('button').count() == 0
+            for activate in ('click', 'space', 'enter'):
+                if activate == 'click':
+                    row.locator('h3').click()
+                else:
+                    row.focus(); page.keyboard.press('Space' if activate == 'space' else 'Enter')
+                assert row.get_attribute('data-selected') == 'true'
+                open_selected_profile(page, inquiry_id)
+                assert_profile('Test Alex River'); close_profile()
+                row.locator('h3').click()
+                assert row.get_attribute('data-selected') == 'false'
+            open_selected_profile(page, inquiry_id)
             assert_profile('Test Alex River')
             initial = read_record()
             # Cancel and Escape leave saved data, filter, profile and activity untouched.
@@ -147,6 +147,7 @@ with tempfile.TemporaryDirectory() as temp:
             page.get_by_role('button', name='Confirm Archive', exact=True).click()
             page.get_by_text('Client archived. History retained;', exact=False).wait_for()
             assert row.count() == 0
+            assert page.get_by_role('group', name='Selected client actions').get_by_role('button', name='View', exact=True).is_disabled()
             page.get_by_label('Record visibility', exact=True).select_option('archived')
             row.wait_for()
             assert row.get_by_role('button', name='Edit', exact=True).count() == 0
@@ -163,7 +164,7 @@ with tempfile.TemporaryDirectory() as temp:
             converted_at = read_record()['converted_at']
             # Established clients have exactly the same entry points and editable profile.
             close_profile()
-            row.locator('[role=cell]').nth(2).dblclick(); assert_profile('Test Alex Updated')
+            open_selected_profile(page, inquiry_id); assert_profile('Test Alex Updated')
             open_dialog('edit')
             for width in [320, 375, 768, 1440]:
                 page.set_viewport_size(dict(width=width, height=900))
@@ -189,7 +190,7 @@ with tempfile.TemporaryDirectory() as temp:
             page.evaluate("selectDemoRole('Admin');state.activeAdminPanel='established';render()")
             page.get_by_label('Search clients', exact=True).fill(inquiry_id)
             page.get_by_label('Record visibility', exact=True).select_option('archived')
-            row.get_by_role('button', name='Open profile', exact=True).click()
+            open_selected_profile(page, inquiry_id)
             assert_profile('Test Established Client')
             assert read_record() == archived
             assert profile.get_by_role('button', name='Save invitation tracking').is_disabled()
@@ -204,7 +205,7 @@ with tempfile.TemporaryDirectory() as temp:
             assert read_record()['portal_status'] == 'Sent'
             assert not errors, errors
             browser.close()
-            print('PASS: both client lists, clickable names, double-click rows/names, Enter, View/Open profile, Cancel/Escape, saved edits, validation/network/stale-edit failures, confirmed archive and restore, responsive forms, original inquiry/history, conversion/invitation, refresh/restart persistence.')
+            print('PASS: both client lists, click and keyboard selection/deselection, toolbar-only View, Cancel/Escape, saved edits, validation/network/stale-edit failures, confirmed archive and restore, responsive forms, original inquiry/history, conversion/invitation, refresh/restart persistence.')
     finally:
         for process in reversed(processes):
             if process.poll() is None:

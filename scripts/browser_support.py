@@ -25,3 +25,9 @@ def legacy_profile_components(page):
     # Keep earlier component regressions; new-tab routing is tested without overrides
     # in check-counselor-profiles.py. No application test flag or access bypass exists.
     page.add_init_script("window.addEventListener('DOMContentLoaded',()=>{openManagedProfile=loadManagedProfile;});")
+
+
+def open_selected_profile(page, inquiry_id=None):
+    row = page.locator('[data-managed-record="' + inquiry_id + '"]') if inquiry_id else page.locator('[data-managed-record]').first
+    row.locator('[data-select-client]').check()
+    page.get_by_role('group', name='Selected client actions').get_by_role('button', name='View', exact=True).click()
