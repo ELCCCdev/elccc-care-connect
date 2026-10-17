@@ -70,6 +70,7 @@ with tempfile.TemporaryDirectory() as temp:
                 assert public.request.get('http://127.0.0.1:5500' + path).status == 404
             public.goto('http://127.0.0.1:5500/?client=' + inquiry_id)
             public.get_by_label('Local staff access key').wait_for()
+            assert public.get_by_role('button', name='Close Profile Tab', exact=True).count() == 0
             assert 'Test Alex River' not in public.locator('main').inner_text()
             directory.get_by_role('button', name='Refresh client lists').click()
             directory.get_by_label('Search clients', exact=True).fill(inquiry_id)
@@ -122,7 +123,20 @@ with tempfile.TemporaryDirectory() as temp:
                 toolbar.get_by_role('button', name='View', exact=True).focus()
                 directory.keyboard.press('Enter')
             selected_popup.value.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
-            selected_popup.value.close()
+            assert selected_popup.value.evaluate('window.opener === null')
+            assert selected_popup.value.get_by_role('button', name='Close Profile Tab', exact=True).is_visible()
+            assert selected_popup.value.get_by_role('button', name='← Home', exact=True).count() == 0
+            assert selected_popup.value.locator('header [data-view=welcome]').count() == 0
+            directory.bring_to_front()
+            count_before = len(context.pages)
+            row.locator('h3').dblclick()
+            toolbar.get_by_role('button', name='View', exact=True).dblclick()
+            directory.wait_for_timeout(300)
+            assert len(context.pages) == count_before
+            assert directory.get_by_label('Search clients', exact=True).input_value() == inquiry_id
+            selected_popup.value.get_by_role('button', name='Close Profile Tab', exact=True).click()
+            selected_popup.value.wait_for_event('close') if not selected_popup.value.is_closed() else None
+
             toolbar.get_by_role('button', name='Edit', exact=True).click()
             directory.get_by_role('heading', name='Edit client details', exact=True).wait_for()
             directory.keyboard.press('Escape')
@@ -143,13 +157,16 @@ with tempfile.TemporaryDirectory() as temp:
                 page_count = len(context.pages)
                 with context.expect_page() as popup:
                     row.locator('[data-select-client]').uncheck()
-                    if action == 'name':
+                    if action == 'double':
+                        row.locator('h3').dblclick()
+                    elif action == 'name':
                         row.locator('h3').click()
                     elif action == 'keyboard':
                         row.focus(); directory.keyboard.press('Enter')
                     else:
                         row.locator('[data-select-client]').check()
-                    toolbar.get_by_role('button', name='View', exact=True).click()
+                    if action != 'double':
+                        toolbar.get_by_role('button', name='View', exact=True).click()
                 page = popup.value
                 page.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
                 assert page.url == 'http://127.0.0.1:5500/?client=' + inquiry_id
@@ -159,7 +176,7 @@ with tempfile.TemporaryDirectory() as temp:
                 assert directory.locator('[data-managed-profile]').count() == 0
                 return page
 
-            for action in ['name', 'keyboard', 'View']:
+            for action in ['name', 'keyboard', 'View', 'double']:
                 page = open_profile(action)
                 page.close(); directory.bring_to_front(); row.wait_for()
             profile = open_profile('View')
@@ -325,7 +342,53 @@ with tempfile.TemporaryDirectory() as temp:
                 established_toolbar.get_by_role('button', name='View', exact=True).click()
             established_tab = popup.value
             established_tab.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
+            assert established_tab.evaluate('window.opener === null')
+            assert established_tab.get_by_role('link', name='Back to Clients', exact=True).get_attribute('href').endswith('list=established')
+            profile.bring_to_front()
+            count_before = len(context.pages)
+            profile.locator('[data-managed-record] h3').dblclick()
+            established_toolbar.get_by_role('button', name='View', exact=True).dblclick()
+            profile.wait_for_timeout(300)
+            assert len(context.pages) == count_before
+            # Mobile uses the same accessible View path and double-click event where supported.
+            profile.set_viewport_size(dict(width=375, height=812))
+            profile.locator('[data-managed-record] h3').click()
+            assert established_toolbar.get_by_role('button', name='View', exact=True).is_disabled()
+            profile.locator('[data-managed-record] h3').click()
+            established_toolbar.get_by_role('button', name='View', exact=True).focus()
+            profile.keyboard.press('Enter')
+            assert len(context.pages) == count_before
+            assert not profile.evaluate('document.documentElement.scrollWidth > innerWidth + 1')
+
             assert '?workspace=clients' in profile.url
+            # A real touch-enabled mobile context retains selection and uses View without double-tap gestures.
+            mobile_context = browser.new_context(is_mobile=True, has_touch=True, viewport={'width': 375, 'height': 812})
+            mobile = mobile_context.new_page()
+            staff_login(mobile)
+            mobile.goto('http://127.0.0.1:5500/?workspace=clients&list=established')
+            mobile.get_by_label('Search clients', exact=True).fill(inquiry_id)
+            mobile_row = mobile.locator('[data-managed-record="' + inquiry_id + '"]')
+            mobile_toolbar = mobile.get_by_role('group', name='Selected client actions')
+            mobile_row.locator('h3').tap()
+            assert mobile_row.get_attribute('data-selected') == 'true'
+            mobile_row.locator('h3').tap()
+            assert mobile_row.get_attribute('data-selected') == 'false'
+            mobile_row.locator('[data-select-client]').tap()
+            with mobile_context.expect_page() as touch_popup:
+                mobile_toolbar.get_by_role('button', name='View', exact=True).tap()
+            touch_profile = touch_popup.value
+            touch_profile.get_by_role('heading', name='Test Alex River', exact=True).wait_for()
+            assert touch_profile.evaluate('window.opener === null')
+            touch_profile.get_by_role('button', name='Edit', exact=True).tap()
+            touch_profile.get_by_label('Full name', exact=True).fill('Test Unsaved Mobile Draft')
+            mobile_toolbar.get_by_role('button', name='View', exact=True).tap()
+            mobile_toolbar.get_by_role('button', name='View', exact=True).tap()
+            assert len(mobile_context.pages) == 2
+            assert touch_profile.get_by_label('Full name', exact=True).input_value() == 'Test Unsaved Mobile Draft'
+            touch_profile.keyboard.press('Escape')
+            assert not touch_profile.evaluate('document.documentElement.scrollWidth > innerWidth + 1')
+            touch_profile.get_by_role('button', name='Close Profile Tab', exact=True).tap()
+            mobile_context.close()
             # Shared-cookie sign-out clears another profile on focus instead of revealing cached details.
             profile.bring_to_front()
             # A failed logout remains visible and keeps the active session.
@@ -343,7 +406,7 @@ with tempfile.TemporaryDirectory() as temp:
             assert 'Test Alex River' not in established_tab.locator('main').inner_text()
             assert not errors, errors
             browser.close()
-            print('PASS: protected stable profile URLs, toolbar-only new-tab profiles, row click and keyboard selection/deselection, original directory preserved, six sections, edit/cancel/save/archive/restore, preferred versus assigned counselor, confirmed assignment/change/removal, scoped counselor caseload and read-only profiles, blocked anonymous access/files, Intake navigation, selected toolbars in both lists, keyboard selection and new-tab View, canceled Edit/Archive, filter isolation, header at four widths, failed/successful logout, refresh and actual restart with reauthentication.')
+            print('PASS: protected stable profile URLs, double-click/View reuse without duplicate tabs, context-specific profile navigation and close, touch-enabled mobile entry, row click and keyboard selection/deselection, original directory preserved, six sections, edit/cancel/save/archive/restore, preferred versus assigned counselor, confirmed assignment/change/removal, scoped counselor caseload and read-only profiles, blocked anonymous access/files, Intake navigation, selected toolbars in both lists, keyboard selection and new-tab View, canceled Edit/Archive, filter isolation, header at four widths, failed/successful logout, refresh and actual restart with reauthentication.')
     finally:
         for process in reversed(processes):
             if process.poll() is None:

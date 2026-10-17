@@ -13,6 +13,41 @@ commit and preserves its history. No saved Intake/header/selection-toolbar chang
 were found in the supplied working tree or the latest pushed profile branch;
 unsaved work from the interrupted conversation could not be recovered.
 
+## Profile navigation refinements
+
+In both client lists, double-clicking plain row content opens the same profile as
+selected-toolbar View. Single click still selects; clicking the selected row again
+deselects it. Checkbox, Space and Enter selection remain available. Mobile users can
+tap to select and use View without relying on a double-tap gesture.
+
+Repeated row double-clicks and View clicks focus the existing profile tab instead of
+creating another one, preserving its unsaved form draft. Closing that profile allows
+it to be opened again. Reuse is tracked in memory by the launching workspace tab;
+reloading that workspace or opening a different workspace tab starts new tracking.
+Browser popup/focus preferences still apply. Blocked popups show a retry instruction.
+
+Profiles use a dedicated header without public Home or role-switch links. App-opened
+profiles offer Close Profile Tab to return to the original workspace, plus a Back to
+Clients fallback that opens the correct prospective/established list in the current
+tab. Counselor profiles link back to Counselor Workspace. Direct/bookmarked profile
+URLs offer the workspace return link without depending on browser history or a
+script-close permission. The original list tab retains its filters and selection.
+New tabs have their opener detached before loading the profile. No backend route,
+authentication rule, saved record, assignment, or database schema changed.
+
+Validation passed: 38 backend tests, all nine Node checks, four Python browser
+integration suites, the responsive and role browser suites, build, and whitespace
+checks. The profile test includes repeated double-click/View interactions in both
+client lists, reopening closed tabs, opener detachment, Close Profile Tab, touch
+selection/View, and preservation of an unsaved mobile edit when reusing a tab.
+
+Manual review: select/deselect a row, double-click it, then repeatedly use View from
+the original list and confirm only one profile tab remains. Repeat after conversion
+in Established Clients. Close Profile Tab, reopen, and test Back to Clients. Also open
+a bookmarked profile directly and confirm it has no public Home action. On a phone,
+use selection and View; native double-tap behavior, Safari/iOS, browser popup policies,
+and screen-reader announcements require manual review on the actual devices.
+
 ## Current selection and onboarding refinements
 
 Client rows now contain only record information and a selection checkbox. Click a
